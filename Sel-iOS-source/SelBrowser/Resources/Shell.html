@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Sel Браузер</title>
+    <!-- Tailwind CSS -->
+    <script src="tailwind.js"></script>
+    <!-- Lucide Icons -->
+    <script src="lucide.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        sel: {
+                            topbg: 'var(--bg-top)',
+                            navbg: 'var(--bg-nav)',
+                            mainbg: 'var(--bg-main)',
+                            text: 'var(--text-main)',
+                            textmuted: 'var(--text-muted)',
+                            border: 'var(--border-color)',
+                            hover: 'var(--hover-bg)'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            /* Стандартная светлая тема */
+            --bg-top: #dfe3e8;
+            --bg-nav: #ffffff;
+            --bg-main: #f3f6f9;
+            --bg-address: #f1f3f4;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e5e7eb;
+            --hover-bg: rgba(0, 0, 0, 0.05);
+            --tab-active: #ffffff;
+            --ntp-grad-1: #f8f9fc;
+            --ntp-grad-2: #eef2f9;
+            --accent-color: #3b82f6;
+        }
+
+        .dark {
+            /* Стандартная тёмная тема */
+            --bg-top: #1a1d21;
+            --bg-nav: #292a2d;
+            --bg-main: #202124;
+            --bg-address: #202124;
+            --text-main: #e8eaed;
+            --text-muted: #9aa0a6;
+            --border-color: #3c4043;
+            --hover-bg: rgba(255, 255, 255, 0.1);
+            --tab-active: #292a2d;
+            --ntp-grad-1: #202124;
+            --ntp-grad-2: #171717;
+            --accent-color: #3b82f6;
+        }
+
+        /* ТЕМА ЧЕМПИОНАТА МИРА 2026 (WC 2026) */
+        .theme-wc2026 {
+            --bg-top: #062317; /* Темный стадионный изумруд */
+            --bg-nav: #0a3825; /* Трава стадиона */
+            --bg-main: #04170f; /* Футбольная ночь */
+            --bg-address: #114a33;
+            --text-main: #ffffff;
+            --text-muted: #83b39b;
+            --border-color: #175e41;
+            --hover-bg: rgba(255, 255, 255, 0.12);
+            --tab-active: #0a3825;
+            --ntp-grad-1: #0a3825;
+            --ntp-grad-2: #03120c;
+            --accent-color: #10b981; /* Неоновый зеленый */
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            transition: background-color 0.25s ease, color 0.25s ease;
+        }
+
+        * { transition: background-color 0.15s ease, border-color 0.15s ease; }
+
+        .tab-active::before { box-shadow: 4px 4px 0 4px var(--tab-active); }
+        .tab-active::after { box-shadow: -4px 4px 0 4px var(--tab-active); }
+        
+        .drag-region { -webkit-app-region: drag; }
+        .no-drag { -webkit-app-region: no-drag; }
+        #tabs-container { app-region: drag; -webkit-app-region: drag; min-width: 0; }
+        .tab-element, #tabs-container button { app-region: no-drag; -webkit-app-region: no-drag; }
+
+        /* Кастомный скроллбар */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(150, 150, 150, 0.3); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(150, 150, 150, 0.5); }
+    </style>
+    <style id="sel-ios-adaptation">
+        html,body{height:100%;overscroll-behavior:none;-webkit-text-size-adjust:100%}
+        input[type=search],select,input[type=number]{font-size:16px!important}
+        .drag-region,#tabs-container,.no-drag,.tab-element{-webkit-app-region:no-drag;app-region:no-drag}
+        #setting-memory-saver,#setting-suspend-after{display:none}
+        @media(max-width:600px){
+            #tabs-container .tab-element{min-width:108px!important;padding-left:9px;padding-right:7px}
+            #tabs-container+div{margin-left:3px}
+            #private-badge{font-size:9px;max-width:58px;white-space:normal;line-height:11px}
+            #quick-links{gap:3px}#quick-links>button{width:70px;padding:6px}
+            #view-newtab{overflow-y:auto;justify-content:flex-start;padding-top:max(30px,5vh);padding-bottom:24px}
+            #logo-container{margin-top:auto;margin-bottom:24px}
+            #view-newtab>div:last-child{margin-bottom:auto}
+            #internal-content{padding:24px 16px}
+            #internal-content>.grid{display:block}
+            #internal-content>.grid>div:first-child{margin-bottom:18px}
+            #sport-logo .text-4xl{font-size:24px}#sport-logo .w-12{width:32px;height:32px}
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col overflow-hidden select-none">
+
+    <!-- 1. ВЕРХНЯЯ ПАНЕЛЬ С ВКЛАДКАМИ -->
+    <div class="drag-region flex items-end justify-between pr-2 pt-2" style="background-color: var(--bg-top)">
+        <div class="flex items-end pl-2 w-full overflow-x-auto scrollbar-none space-x-1" id="tabs-container">
+            <!-- Вкладки генерируются динамически через JavaScript -->
+        </div>
+
+        <!-- Кнопки управления окном приложения -->
+        <div class="no-drag flex items-center mb-2 shrink-0 ml-4">
+            <span id="private-badge" class="hidden text-[11px] text-sel-textmuted whitespace-nowrap mr-2">Приватное окно</span>
+            <button onclick="closeWindow()" class="p-2 hover:bg-red-500 hover:text-white rounded-lg transition-colors text-sel-textmuted">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. ПАНЕЛЬ НАВИГАЦИИ (АДРЕСНАЯ СТРОКА) -->
+    <div class="flex items-center justify-between px-2 py-1.5 border-b relative z-20 shadow-sm" style="background-color: var(--bg-nav); border-color: var(--border-color)">
+        
+        <!-- Кнопки Назад / Вперед / Обновить -->
+        <div class="flex items-center space-x-1 mr-2 text-sel-textmuted">
+            <button id="btn-back" onclick="navBack()" class="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-full disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+                <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            </button>
+            <button id="btn-forward" onclick="navForward()" class="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-full disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+                <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+            <button onclick="navReload()" class="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors">
+                <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <!-- Поле ввода адреса / поиска -->
+        <div class="flex-grow flex items-center rounded-full px-3 py-1.5 mx-1" style="background-color: var(--bg-address)">
+            <div class="text-sel-textmuted mr-2 shrink-0">
+                <i data-lucide="globe" class="w-4 h-4"></i>
+            </div>
+            <input id="address-input" type="search" class="w-full bg-transparent border-none focus:outline-none text-[13px] text-sel-text" value="sel://newtab">
+        </div>
+
+        <!-- Правое меню -->
+        <div class="flex items-center space-x-1 ml-2">
+            <button id="menu-btn" onclick="toggleMenu()" class="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-full text-sel-textmuted transition-colors">
+                <i data-lucide="menu" class="w-5 h-5"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 3. ОСНОВНАЯ РАБОЧАЯ ОБЛАСТЬ -->
+    <div id="content-area" class="flex-1 relative flex flex-col overflow-hidden" style="background-color: var(--bg-main)">
+        
+        <!-- СЛОЙ 1: НОВАЯ ВКЛАДКА (NEW TAB) -->
+        <div id="view-newtab" class="absolute inset-0 flex flex-col items-center justify-center z-10 px-4" style="background-image: linear-gradient(to bottom right, var(--ntp-grad-1), var(--ntp-grad-2))">
+            
+            <!-- Стандартное Лого / Логотип WC 2026 -->
+            <div id="logo-container" class="flex items-center space-x-3 mb-8">
+                <!-- Обычное лого по умолчанию -->
+                <div id="default-logo" class="flex items-center space-x-3">
+                    <svg width="50" height="50" viewBox="0 0 40 40" fill="none">
+                        <path d="M26.5 10H16C12.6863 10 10 12.6863 10 16V17C10 18.6569 11.3431 20 13 20H23C24.6569 20 26 21.3431 26 23V24C26 27.3137 23.3137 30 20 30H13.5" stroke="#3b82f6" stroke-width="6" stroke-linecap="round"/>
+                    </svg>
+                    <span class="text-5xl font-bold tracking-tight text-sel-text">Sel</span>
+                </div>
+
+                <!-- Спортивное Лого Чемпионата Мира 2026 -->
+                <div id="sport-logo" class="hidden flex-col items-center space-y-2 text-center">
+                    <div class="flex items-center space-x-3">
+                        <i data-lucide="trophy" class="w-12 h-12 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]"></i>
+                        <span class="text-4xl md:text-5xl font-black tracking-wider text-white italic uppercase">WORLD CUP 2026</span>
+                    </div>
+                    <span class="text-xs tracking-widest text-emerald-400 uppercase font-extrabold bg-emerald-950/80 px-3 py-1 rounded-full border border-emerald-500/30">
+                        USA • CANADA • MEXICO
+                    </span>
+                </div>
+            </div>
+
+            <!-- Строка Поиска -->
+            <div class="w-full max-w-[580px] rounded-full shadow-md border flex items-center px-4 py-3 hover:shadow-lg transition-all mb-8" style="background-color: var(--bg-nav); border-color: var(--border-color)">
+                <i data-lucide="search" class="w-5 h-5 text-gray-400 mr-3 shrink-0"></i>
+                <input id="main-search-input" type="search" class="flex-1 bg-transparent border-none focus:outline-none text-[15px] text-sel-text" placeholder="Поиск в Интернете...">
+            </div>
+
+            <div class="w-full max-w-[580px]">
+                <div class="text-[11px] text-sel-textmuted text-center mb-3">Быстрый доступ</div>
+                <div class="flex items-center justify-center gap-3" id="quick-links">
+                    <button data-url="https://www.google.com" class="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-sel-textmuted text-[11px] w-20"><span class="rounded-full p-3 border" style="background-color:var(--bg-nav);border-color:var(--border-color)"><i data-lucide="search" class="w-5 h-5"></i></span>Google</button>
+                    <button data-url="https://ya.ru" class="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-sel-textmuted text-[11px] w-20"><span class="rounded-full p-3 border" style="background-color:var(--bg-nav);border-color:var(--border-color)"><i data-lucide="globe" class="w-5 h-5"></i></span>Яндекс</button>
+                    <button data-url="https://www.youtube.com" class="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-sel-textmuted text-[11px] w-20"><span class="rounded-full p-3 border" style="background-color:var(--bg-nav);border-color:var(--border-color)"><i data-lucide="play" class="w-5 h-5"></i></span>YouTube</button>
+                    <button data-url="https://ru.wikipedia.org" class="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-sel-textmuted text-[11px] w-20"><span class="rounded-full p-3 border" style="background-color:var(--bg-nav);border-color:var(--border-color)"><i data-lucide="book-open" class="w-5 h-5"></i></span>Wikipedia</button>
+                </div>
+                <div id="home-bookmarks" class="hidden flex flex-wrap items-center justify-center gap-2 mt-5"></div>
+                <p id="private-note" class="hidden text-[11px] text-sel-textmuted text-center mt-5 leading-relaxed">История и cookie этого окна не сохраняются после закрытия. Скачанные файлы остаются на диске. Режим не скрывает активность от сайтов и провайдера.</p>
+            </div>
+
+        </div>
+
+        <!-- СЛОЙ 2: ВЕБ-ОБЛАСТЬ (CHROMIUM WEBVIEW) -->
+        <div id="view" class="absolute inset-0 w-full h-full z-0 bg-white">
+            <!-- Webview для сайтов рендерятся тут -->
+        </div>
+
+        <!-- СЛОЙ 3: ВНУТРЕННИЕ СТРАНИЦЫ (НАСТРОЙКИ И Т.Д.) -->
+        <div id="view-internal" class="hidden absolute inset-0 z-30 overflow-y-auto" style="background-color: var(--bg-main)">
+            <div class="max-w-3xl mx-auto py-10 px-6 text-sel-text" id="internal-content"></div>
+        </div>
+    </div>
+
+    <!-- ВСПЛЫВАЮЩЕЕ МЕНЮ БРАУЗЕРА -->
+    <div id="browser-menu" class="absolute top-[46px] right-2 w-[280px] rounded-xl shadow-2xl border flex flex-col z-[100] text-[13px] py-2 hidden" style="background-color: var(--bg-nav); border-color: var(--border-color); color: var(--text-main)">
+        <button onclick="createTab()" class="w-full flex items-center px-4 py-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+            <i data-lucide="plus" class="w-4 h-4 mr-3 text-sel-textmuted"></i> Новая вкладка
+        </button>
+        <button onclick="openInternal('settings')" class="w-full flex items-center px-4 py-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+            <i data-lucide="settings" class="w-4 h-4 mr-3 text-sel-textmuted"></i> Настройки
+        </button>
+    </div>
+
+    <script>
+        // Trusted local iOS shell. Websites render in separate native WKWebView controls.
+        let tabs = [];
+        let activeTabId = '';
+        let lastRenderedActiveTab = '';
+        let lastTabsSignature = '';
+        let draggingTabId = '';
+        let lastSettingsSignature = '';
+        let settingsVisible = false;
+        let settings = { theme: 'light', colorTheme: 'default', searchEngine: 'google' };
+        let nativeState = { canBack: false, canForward: false };
+        const nativeHandler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.sel;
+        const bridge = nativeHandler ? {
+            postMessage: function (message) { nativeHandler.postMessage(message); },
+            addEventListener: function () { /* Native iOS calls window.selApplyState directly. */ }
+        } : null;
+        function send(action, value, extra) {
+            if (bridge) bridge.postMessage({ action: action, value: value == null ? '' : value, extra: extra == null ? '' : extra });
+        }
+        function applySettings() {
+            document.documentElement.classList.remove('dark', 'theme-wc2026');
+            document.getElementById('sport-logo').classList.add('hidden');
+            document.getElementById('default-logo').classList.remove('hidden');
+            if (settings.theme === 'dark') document.documentElement.classList.add('dark');
+            if (settings.colorTheme === 'wc2026') {
+                document.documentElement.classList.add('theme-wc2026');
+                document.getElementById('default-logo').classList.add('hidden');
+                document.getElementById('sport-logo').classList.remove('hidden');
+            }
+            const themeSelect = document.getElementById('setting-theme');
+            const colorSelect = document.getElementById('setting-color');
+            const engineSelect = document.getElementById('setting-engine');
+            if (themeSelect) themeSelect.value = settings.theme;
+            if (colorSelect) colorSelect.value = settings.colorTheme;
+            if (engineSelect) engineSelect.value = settings.searchEngine;
+            const restoreSelect = document.getElementById('setting-restore');
+            if (restoreSelect) restoreSelect.checked = settings.RestoreSession !== false;
+            const closeSelect = document.getElementById('setting-close-behavior');
+            if (closeSelect) closeSelect.value = settings.CloseTabBehavior || 'right';
+            const memorySelect = document.getElementById('setting-memory-saver');
+            if (memorySelect) memorySelect.checked = settings.MemorySaver !== false;
+            const suspendSelect = document.getElementById('setting-suspend-after');
+            if (suspendSelect) {
+                if (document.activeElement !== suspendSelect) suspendSelect.value = settings.SuspendAfterMinutes || 10;
+                suspendSelect.disabled = settings.MemorySaver === false;
+            }
+            const zoomSelect = document.getElementById('setting-default-zoom');
+            if (zoomSelect) {
+                const zoom = String(settings.DefaultZoomPercent || 100);
+                if (!Array.from(zoomSelect.options).some(function (option) { return option.value === zoom; })) {
+                    const option = document.createElement('option'); option.value = zoom; option.textContent = zoom + '%'; zoomSelect.appendChild(option);
+                }
+                zoomSelect.value = zoom;
+            }
+        }
+        function saveSettings(changes) {
+            if (changes.searchEngine) send('settings', 'SearchEngine', changes.searchEngine);
+            if (changes.theme) send('settings', 'Theme', changes.theme);
+            if (changes.colorTheme) send('settings', 'Theme', changes.colorTheme === 'wc2026' ? 'wc2026' : settings.theme);
+            ['RestoreSession', 'CloseTabBehavior', 'MemorySaver', 'SuspendAfterMinutes', 'DefaultZoomPercent'].forEach(function (key) {
+                if (Object.prototype.hasOwnProperty.call(changes, key)) send('settings', key, changes[key]);
+            });
+        }
+        function createTab(url) { send('newTab', url || 'sel://newtab'); }
+        function switchTab(id) { send('selectTab', id); }
+        function closeTab(id, event) { if (event) event.stopPropagation(); send('closeTab', id); }
+        function renderTabs() {
+            const container = document.getElementById('tabs-container');
+            const signature = JSON.stringify([activeTabId, tabs]);
+            if (draggingTabId || signature === lastTabsSignature) return;
+            lastTabsSignature = signature;
+            const oldScroll = container.scrollLeft;
+            let activeElement = null;
+            container.innerHTML = '';
+            tabs.forEach(function (tab) {
+                const isActive = tab.id === activeTabId;
+                const tabEl = document.createElement('div');
+                tabEl.dataset.tabId = tab.id;
+                tabEl.className = 'tab-element flex items-center rounded-t-lg py-1.5 px-3 cursor-pointer relative overflow-hidden group transition-all duration-150 ' + (isActive ? 'tab-active z-10 font-medium' : 'hover:bg-black/5 dark:hover:bg-white/10 text-sel-textmuted');
+                tabEl.style.flex = '0 1 176px';
+                tabEl.style.minWidth = '110px';
+                tabEl.style.maxWidth = '176px';
+                tabEl.style.backgroundColor = isActive ? 'var(--tab-active)' : '';
+                if (isActive) activeElement = tabEl;
+                tabEl.draggable = true;
+                tabEl.ondragstart = function (event) {
+                    if (event.target.closest('button')) { event.preventDefault(); return; }
+                    draggingTabId = tab.id;
+                    event.dataTransfer.setData('application/x-sel-tab-id', tab.id);
+                    event.dataTransfer.effectAllowed = 'move';
+                };
+                tabEl.ondragover = function (event) { if (draggingTabId && draggingTabId !== tab.id) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; } };
+                tabEl.ondrop = function (event) {
+                    event.preventDefault(); event.stopPropagation();
+                    const source = event.dataTransfer.getData('application/x-sel-tab-id');
+                    if (source && source === draggingTabId && source !== tab.id) send('tabMove', source, tab.id);
+                };
+                tabEl.ondragend = function () { draggingTabId = ''; renderTabs(); };
+                tabEl.onclick = function () { switchTab(tab.id); };
+                tabEl.oncontextmenu = function (event) { event.preventDefault(); send('tabMenu', tab.id); };
+                tabEl.onauxclick = function (event) { if (event.button === 1) { event.preventDefault(); closeTab(tab.id, event); } };
+                const iconWrap = document.createElement('div');
+                iconWrap.className = 'w-4 h-4 mr-2 flex items-center justify-center shrink-0 z-10 pointer-events-none';
+                function appendTabIcon(name, spinning) {
+                    const icon = document.createElement('i');
+                    icon.setAttribute('data-lucide', name);
+                    icon.className = 'w-full h-full text-sel-textmuted' + (spinning ? ' animate-spin' : '');
+                    iconWrap.replaceChildren(icon);
+                }
+                if (!tab.loading && typeof tab.favicon === 'string' && tab.favicon.startsWith('data:image/png;base64,')) {
+                    const favicon = document.createElement('img');
+                    favicon.width = favicon.height = 16;
+                    favicon.className = 'w-4 h-4 object-contain';
+                    favicon.alt = '';
+                    favicon.decoding = 'async';
+                    favicon.onerror = function () { appendTabIcon('globe', false); lucide.createIcons(); };
+                    favicon.src = tab.favicon;
+                    iconWrap.appendChild(favicon);
+                } else {
+                    appendTabIcon(tab.loading ? 'rotate-cw' : tab.muted ? 'volume-x' : tab.pinned ? 'pin' : 'globe', tab.loading);
+                }
+                const title = document.createElement('span');
+                title.className = 'text-[12px] truncate flex-grow z-10 select-none pointer-events-none ' + (isActive ? 'text-sel-text' : '');
+                title.textContent = tab.title || 'Новая вкладка';
+                title.title = tab.title || 'Новая вкладка';
+                const close = document.createElement('button');
+                close.className = 'p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded-full shrink-0 ml-1 text-sel-textmuted z-10';
+                close.setAttribute('aria-label', 'Закрыть вкладку');
+                close.dataset.closeTab = tab.id;
+                close.title = 'Закрыть вкладку';
+                close.draggable = false;
+                close.onmousedown = function (event) { event.stopPropagation(); };
+                close.ondragstart = function (event) { event.preventDefault(); };
+                close.onclick = function (event) { closeTab(tab.id, event); };
+                close.innerHTML = '<i data-lucide="x" class="w-3 h-3"></i>';
+                tabEl.append(iconWrap, title, close);
+                container.appendChild(tabEl);
+            });
+            const addBtn = document.createElement('button');
+            addBtn.onclick = function () { createTab(); };
+            addBtn.className = 'p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-full shrink-0 ml-1 mb-1 text-sel-textmuted transition-colors';
+            addBtn.setAttribute('aria-label', 'Новая вкладка');
+            addBtn.innerHTML = '<i data-lucide="plus" class="w-4 h-4"></i>';
+            container.appendChild(addBtn);
+            lucide.createIcons();
+            container.scrollLeft = oldScroll;
+            if (activeElement && lastRenderedActiveTab !== activeTabId) activeElement.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            lastRenderedActiveTab = activeTabId;
+        }
+        function navBack() { send('back'); }
+        function navForward() { send('forward'); }
+        function navReload() { send('reload'); }
+        function updateNavButtons() {
+            document.getElementById('btn-back').disabled = !nativeState.canBack;
+            document.getElementById('btn-forward').disabled = !nativeState.canForward;
+        }
+        function navigateTo(value) { if (String(value).trim()) send('navigate', String(value).trim()); }
+        function openGoogleMatch(query) { navigateTo('https://www.google.com/search?q=' + encodeURIComponent(query)); }
+        function handleSearch(event) { if (event.key === 'Enter' && event.target.value.trim()) { event.preventDefault(); navigateTo(event.target.value); event.target.blur(); } }
+        document.getElementById('main-search-input').addEventListener('keydown', handleSearch);
+        document.getElementById('address-input').addEventListener('keydown', handleSearch);
+        function openInternal(page) { navigateTo('sel://' + page); }
+        function renderInternalPage(page) {
+            const content = document.getElementById('internal-content');
+            if (page === 'settings') {
+                content.innerHTML = `
+                    <h2 class="text-3xl font-light mb-8 flex items-center"><i data-lucide="settings" class="w-8 h-8 mr-4 text-sel-textmuted"></i> Настройки</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div class="col-span-1 space-y-2">
+                            <div class="px-4 py-2 bg-blue-500/10 text-blue-500 rounded-lg font-medium text-sm">Внешний вид</div>
+                        </div>
+                        <div class="col-span-2 space-y-6">
+                            <div class="rounded-xl p-6 shadow-sm border" style="background-color: var(--bg-nav); border-color: var(--border-color)">
+                                <h3 class="font-medium mb-4">Поисковая система</h3>
+                                <select id="setting-engine" onchange="saveSettings({searchEngine: this.value})" class="w-full border rounded-lg px-4 py-2 text-sm outline-none bg-transparent" style="border-color: var(--border-color)">
+                                    <option value="yandex">Яндекс</option>
+                                    <option value="google">Google</option>
+                                    <option value="duckduckgo">DuckDuckGo</option>
+                                </select>
+                            </div>
+                            <div class="rounded-xl p-6 shadow-sm border" style="background-color: var(--bg-nav); border-color: var(--border-color)">
+                                <h3 class="font-medium mb-4">Тема оформления</h3>
+                                <select id="setting-theme" onchange="saveSettings({theme: this.value})" class="w-full border rounded-lg px-4 py-2 text-sm outline-none bg-transparent mb-4" style="border-color: var(--border-color)">
+                                    <option value="light">Светлая</option>
+                                    <option value="dark">Тёмная</option>
+                                </select>
+                                <h3 class="font-medium mb-4">Кастомизация</h3>
+                                <select id="setting-color" onchange="saveSettings({colorTheme: this.value})" class="w-full border rounded-lg px-4 py-2 text-sm outline-none bg-transparent" style="border-color: var(--border-color)">
+                                    <option value="default">Стандартная</option>
+                                    <option value="wc2026">🏆 WORLD CUP 2026 (Спортивная)</option>
+                                </select>
+                            </div>
+                            <div class="rounded-xl p-6 shadow-sm border" style="background-color: var(--bg-nav); border-color: var(--border-color)">
+                                <label class="flex items-center justify-between gap-4 text-sm"><span>Восстанавливать открытые вкладки при запуске</span><input id="setting-restore" type="checkbox" onchange="saveSettings({RestoreSession:this.checked})" class="w-4 h-4 shrink-0" style="accent-color:var(--accent-color)"></label>
+                                <h3 class="font-medium mt-5 mb-3">После закрытия активной вкладки</h3>
+                                <select id="setting-close-behavior" onchange="saveSettings({CloseTabBehavior:this.value})" class="w-full border rounded-lg px-4 py-2 text-sm outline-none bg-transparent" style="border-color:var(--border-color)">
+                                    <option value="right">Переходить к вкладке справа</option>
+                                    <option value="left">Переходить к вкладке слева</option>
+                                    <option value="recent">Возвращаться к последней активной</option>
+                                </select>
+                            </div>
+                            <div class="rounded-xl p-6 shadow-sm border" style="background-color: var(--bg-nav); border-color: var(--border-color)">
+                                <label class="flex items-center justify-between gap-4 text-sm font-medium"><span>Экономия памяти</span><input id="setting-memory-saver" type="checkbox" onchange="saveSettings({MemorySaver:this.checked})" class="w-4 h-4 shrink-0" style="accent-color:var(--accent-color)"></label>
+                                <p class="text-xs text-sel-textmuted mt-3 mb-4 leading-relaxed">Приостанавливать неактивные вкладки через указанное время. Закреплённые вкладки, воспроизведение звука и активные загрузки исключаются.</p>
+                                <label class="flex items-center justify-between gap-4 text-sm"><span>Приостанавливать через, минут</span><input id="setting-suspend-after" type="number" min="1" max="120" onchange="saveSettings({SuspendAfterMinutes:Math.max(1,Math.min(120,Number(this.value)||10))})" class="w-20 border rounded-lg px-3 py-2 outline-none bg-transparent disabled:opacity-40" style="border-color:var(--border-color)"></label>
+                            </div>
+                            <div class="rounded-xl p-6 shadow-sm border" style="background-color: var(--bg-nav); border-color: var(--border-color)">
+                                <h3 class="font-medium mb-4">Масштаб страниц по умолчанию</h3>
+                                <select id="setting-default-zoom" onchange="saveSettings({DefaultZoomPercent:Number(this.value)})" class="w-full border rounded-lg px-4 py-2 text-sm outline-none bg-transparent" style="border-color:var(--border-color)">
+                                    <option value="50">50%</option><option value="67">67%</option><option value="75">75%</option><option value="80">80%</option><option value="90">90%</option><option value="100">100%</option><option value="110">110%</option><option value="125">125%</option><option value="150">150%</option><option value="175">175%</option><option value="200">200%</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            lucide.createIcons();
+            applySettings();
+        }
+
+
+        const renderDesktopSettings = renderInternalPage;
+        renderInternalPage = function (page) {
+            renderDesktopSettings(page);
+            const memory = document.getElementById('setting-memory-saver');
+            if (memory) {
+                const card = memory.closest('div.rounded-xl');
+                if (card) {
+                    card.replaceChildren();
+                    const heading = document.createElement('h3'); heading.className='font-medium mb-3'; heading.textContent='Память на iPhone';
+                    const note = document.createElement('p'); note.className='text-xs text-sel-textmuted leading-relaxed';
+                    note.textContent='Память и фоновые страницы на iOS управляются системой и WebKit автоматически.';
+                    card.append(heading,note);
+                }
+            }
+        };
+        function toggleMenu() { send('menu'); }
+        function closeWindow() { send('closeWindow'); }
+        function openQuickLink(event, url) { if (event.ctrlKey || event.metaKey || event.button === 1) send('newTab', url); else navigateTo(url); }
+        document.getElementById('quick-links').addEventListener('click', function (event) { const button = event.target.closest('[data-url]'); if (button) openQuickLink(event, button.dataset.url); });
+        document.getElementById('quick-links').addEventListener('auxclick', function (event) { const button = event.target.closest('[data-url]'); if (button && event.button === 1) { event.preventDefault(); openQuickLink(event, button.dataset.url); } });
+        function renderHomeBookmarks(bookmarks) {
+            const container = document.getElementById('home-bookmarks');
+            container.replaceChildren();
+            (Array.isArray(bookmarks) ? bookmarks : []).slice(0, 4).forEach(function (bookmark) {
+                const button = document.createElement('button');
+                button.className = 'text-[11px] text-sel-textmuted border rounded-full px-3 py-1.5 max-w-[110px] truncate hover:bg-black/5 dark:hover:bg-white/5';
+                button.style.borderColor = 'var(--border-color)';
+                button.textContent = bookmark.title || bookmark.Title || bookmark.url || bookmark.Url || 'Закладка';
+                button.title = button.textContent;
+                button.onclick = function (event) { openQuickLink(event, bookmark.url || bookmark.Url); };
+                container.appendChild(button);
+            });
+            if (container.childElementCount) {
+                const all = document.createElement('button');
+                all.className = 'text-[11px] text-sel-textmuted px-2 py-1.5 hover:underline';
+                all.textContent = 'Все закладки';
+                all.onclick = function () { navigateTo('sel://bookmarks'); };
+                container.appendChild(all);
+            }
+            container.classList.toggle('hidden', !container.childElementCount);
+        }
+        function reportBounds() {
+            const rect = document.getElementById('content-area').getBoundingClientRect();
+            send('bounds', JSON.stringify({ top: rect.top, left: rect.left, width: rect.width, height: rect.height, scale: window.devicePixelRatio || 1 }));
+        }
+        window.selApplyState = function (state) {
+            if (!state || state.type !== 'state') return;
+            nativeState = state;
+            tabs = (Array.isArray(state.tabs) ? state.tabs : []).map(function (tab) { return Object.assign({}, tab, { id: String(tab.id) }); });
+            activeTabId = state.active == null ? '' : String(state.active);
+            const incoming = state.settings || {};
+            const theme = incoming.theme || incoming.Theme || 'light';
+            settings = {
+                theme: theme === 'wc2026' ? settings.theme : theme,
+                colorTheme: theme === 'wc2026' ? 'wc2026' : 'default',
+                searchEngine: incoming.searchEngine || incoming.SearchEngine || 'google',
+                RestoreSession: incoming.RestoreSession !== false,
+                CloseTabBehavior: incoming.CloseTabBehavior || 'right',
+                MemorySaver: incoming.MemorySaver !== false,
+                SuspendAfterMinutes: incoming.SuspendAfterMinutes || 10,
+                DefaultZoomPercent: incoming.DefaultZoomPercent || 100
+            };
+            const tab = tabs.find(function (item) { return item.id === activeTabId; }) || tabs[0];
+            const url = tab ? tab.url : 'sel://newtab';
+            const showNewTab = url === 'sel://newtab';
+            const showSettings = url === 'sel://settings';
+            document.getElementById('view-newtab').classList.toggle('hidden', !showNewTab);
+            document.getElementById('view-internal').classList.toggle('hidden', !showSettings);
+            document.getElementById('private-badge').classList.toggle('hidden', !state.isPrivate);
+            document.getElementById('private-note').classList.toggle('hidden', !state.isPrivate);
+            renderHomeBookmarks(state.bookmarks);
+            const settingsSignature = JSON.stringify(settings);
+            if (showSettings && (!settingsVisible || lastSettingsSignature !== settingsSignature)) renderInternalPage('settings');
+            settingsVisible = showSettings;
+            lastSettingsSignature = settingsSignature;
+            const address = document.getElementById('address-input');
+            if (document.activeElement !== address) address.value = showNewTab ? '' : url;
+            renderTabs();
+            applySettings();
+            updateNavButtons();
+            requestAnimationFrame(reportBounds);
+        };
+        if (bridge) bridge.addEventListener('message', function (event) { window.selApplyState(event.data); });
+        new ResizeObserver(reportBounds).observe(document.getElementById('content-area'));
+        window.addEventListener('resize', reportBounds);
+        lucide.createIcons();
+        applySettings();
+        send('ready');
+        reportBounds();
+    </script>
+</body>
+</html>
