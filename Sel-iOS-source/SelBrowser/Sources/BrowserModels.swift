@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import WebKit
 
 struct BrowserSettings: Codable {
@@ -23,7 +24,7 @@ struct BrowserSettings: Codable {
         if !(50...200).contains(defaultZoomPercent) { defaultZoomPercent = 100 }
     }
     var shellState: [String: Any] {
-        ["theme": theme, "searchEngine": searchEngine, "RestoreSession": restoreSession,
+        ["theme": theme == "wc2026" ? "dark" : theme, "colorTheme": theme == "wc2026" ? "wc2026" : "default", "searchEngine": searchEngine, "RestoreSession": restoreSession,
          "CloseTabBehavior": closeTabBehavior, "DefaultZoomPercent": defaultZoomPercent,
          "MemorySaver": false, "SuspendAfterMinutes": 10]
     }
@@ -83,7 +84,7 @@ final class BrowserStorage {
     }
 }
 
-final class BrowserTab {
+@MainActor final class BrowserTab {
     let id: String
     var url: String
     var title: String
@@ -96,11 +97,15 @@ final class BrowserTab {
     var faviconTask: URLSessionDataTask?
     var lastSelected = Date()
     var lastRecordedURL: String?
+    // Thumbnails stay in memory, including in private mode; they never enter BrowserSnapshot.
+    var preview: UIImage?
+    var previewGeneration = UUID()
     init(url: String = "sel://newtab", id: String = UUID().uuidString, pinned: Bool = false) {
         self.id = id; self.url = url; self.pinned = pinned
         self.title = BrowserAddress.title(for: url)
     }
     func dispose() {
+        preview = nil; previewGeneration = UUID()
         faviconTask?.cancel(); faviconTask = nil
         observations.removeAll()
         webView?.stopLoading()
@@ -112,7 +117,7 @@ final class BrowserTab {
     deinit { faviconTask?.cancel() }
 }
 
-final class BrowserContext {
+@MainActor final class BrowserContext {
     let isPrivate: Bool
     let dataStore: WKWebsiteDataStore
     var settings: BrowserSettings

@@ -26,24 +26,30 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
     private var downloads: [ObjectIdentifier: URL] = [:]
     private var retainedDownloads: [ObjectIdentifier: WKDownload] = [:]
     private var storageErrorShown = false
+    private let mobileChrome = MobileBrowserChrome()
+    private weak var tabOverview: TabOverviewController?
+    private var snapshotsInProgress = Set<String>()
+    private var didPreparePreview = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
+        view.accessibilityIdentifier = "selMobileBrowser"
         container.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(container)
+        configureMobileChrome()
         NSLayoutConstraint.activate([
             container.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
             container.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
             container.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            container.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+            container.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         let saved = storage.load()
         normal = BrowserContext(isPrivate: false, settings: saved.settings, bookmarks: saved.bookmarks, history: saved.history)
         context = normal
         if saved.settings.restoreSession {
             normal.tabs = saved.session.prefix(40).filter { BrowserAddress.isWeb($0.url) || ["sel://newtab", "sel://settings"].contains($0.url) }
-                .map { BrowserTab(url: $0.url, id: $0.id, pinned: $0.pinned) }
+                .map { BrowserTab(url: $0.url == "sel://settings" ? "sel://newtab" : $0.url, id: $0.id, pinned: $0.pinned) }
             normal.activeID = saved.activeID
         }
         if normal.tabs.isEmpty { normal.tabs = [BrowserTab()] }
@@ -59,8 +65,44 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        shell?.frame = container.bounds
+        let top = max(0, mobileChrome.header.frame.maxY - container.frame.minY + 8)
+        let bottom = max(top, mobileChrome.footer.frame.minY - container.frame.minY - 8)
+        shell?.frame = CGRect(x: 0, y: top, width: container.bounds.width, height: bottom - top)
         layoutWebsiteViews()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        prepareSimulatorPreviewIfRequested()
+    }
+
+    override func didReceiveMemoryWarning() {
+        super.didReceiveMemoryWarning()
+        for owner in allContexts { for tab in owner.tabs { tab.preview = nil } }
+        refreshTabOverview()
+    }
+
+    private func configureMobileChrome() {
+        view.addSubview(mobileChrome.header)
+        view.addSubview(mobileChrome.footer)
+        NSLayoutConstraint.activate([
+            mobileChrome.header.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
+            mobileChrome.header.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+            mobileChrome.header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 6),
+            mobileChrome.header.heightAnchor.constraint(equalToConstant: 52),
+            mobileChrome.footer.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 14),
+            mobileChrome.footer.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -14),
+            mobileChrome.footer.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -8),
+            mobileChrome.footer.heightAnchor.constraint(equalToConstant: 56)
+        ])
+        mobileChrome.onNavigate = { [weak self] value in self?.navigate(value) }
+        mobileChrome.onBack = { [weak self] in self?.handle("back", body: [:]) }
+        mobileChrome.onForward = { [weak self] in self?.handle("forward", body: [:]) }
+        mobileChrome.onReload = { [weak self] in self?.handle("reload", body: [:]) }
+        mobileChrome.onHome = { [weak self] in self?.navigate("sel://newtab") }
+        mobileChrome.onTabs = { [weak self] in self?.showTabOverview() }
+        mobileChrome.onSettings = { [weak self] in self?.showSettings() }
+        mobileChrome.onMenu = { [weak self] in self?.showMenu() }
     }
 
     private func configureShell() {
@@ -84,9 +126,14 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
     }
 
     private func layoutWebsiteViews() {
-        let fallback = CGRect(x: 0, y: 84, width: container.bounds.width, height: max(0, container.bounds.height - 84))
-        let frame = contentBounds.width > 0 ? contentBounds : fallback
-        for c in allContexts { for tab in c.tabs { tab.webView?.frame = frame } }
+        contentBounds = container.bounds
+        let top = max(0, mobileChrome.header.frame.maxY - container.frame.minY + 8)
+        let bottom = max(view.safeAreaInsets.bottom, container.frame.maxY - mobileChrome.footer.frame.minY + 8)
+        for c in allContexts { for tab in c.tabs {
+            tab.webView?.frame = container.bounds
+            tab.webView?.scrollView.contentInset = UIEdgeInsets(top: top, left: 0, bottom: bottom, right: 0)
+            tab.webView?.scrollView.verticalScrollIndicatorInsets = UIEdgeInsets(top: top, left: 0, bottom: bottom, right: 0)
+        } }
     }
 
     private var allContexts: [BrowserContext] { [normal, privateContext].compactMap { $0 } }
@@ -110,6 +157,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         let webView = WKWebView(frame: contentBounds, configuration: configuration)
         webView.navigationDelegate = self; webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.scrollView.keyboardDismissMode = .interactive
         webView.pageZoom = CGFloat(owner.settings.defaultZoomPercent) / 100
         webView.isHidden = true
         tab.webView = webView
@@ -144,6 +193,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
 
     private func select(_ tab: BrowserTab) {
         guard context.tabs.contains(where: { $0 === tab }) else { return }
+        if let previous = context.active, previous !== tab { capturePreview(previous, owner: context) }
         context.activeID = tab.id; tab.lastSelected = Date()
         for c in allContexts { for t in c.tabs { t.webView?.isHidden = true } }
         if !tab.url.hasPrefix("sel://") {
@@ -184,6 +234,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         guard let tab = context.active else { return }
         guard let target = BrowserAddress.resolve(input, engine: context.settings.searchEngine) else { alert("Адрес не поддерживается", "Введите HTTP- или HTTPS-адрес либо поисковый запрос."); return }
         switch target {
+        case "sel://settings": showSettings(); return
         case "sel://bookmarks": showBookmarks(); return
         case "sel://history": showHistory(); return
         case "sel://downloads": showDownloads(); return
@@ -214,11 +265,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         switch action {
         case "ready": shellReady = true; lastShellJSON = ""; pushState()
         case "bounds":
-            if let data = value.data(using: .utf8), let rect = (try? JSONSerialization.jsonObject(with: data)) as? [String: Double],
-               let x = rect["left"], let y = rect["top"], let width = rect["width"], let height = rect["height"],
-               [x, y, width, height].allSatisfy({ $0.isFinite }), width > 0, height >= 0 {
-                contentBounds = CGRect(x: x, y: y, width: width, height: height); layoutWebsiteViews()
-            }
+            // The iOS host owns the entire page rectangle; HTML never positions browser controls.
+            layoutWebsiteViews()
         case "newTab": newTab(value.isEmpty ? "sel://newtab" : value)
         case "selectTab": if let tab = context.tabs.first(where: { $0.id == value }) { select(tab) }
         case "closeTab": if let tab = context.tabs.first(where: { $0.id == value }) { close(tab) }
@@ -260,7 +308,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
             }
         default: break // WebKit manages iOS memory; unsupported controls are hidden by the mobile adapter.
         }
-        pushState(); if !context.isPrivate { scheduleSave() }
+        applySettings(context.settings)
     }
 
     private func scheduleState() {
@@ -270,6 +318,17 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
     }
 
     private func pushState() {
+        guard context != nil, let current = context.active else { return }
+        let retained = current.url.hasPrefix("sel://") && (current.webView?.url).map({ BrowserAddress.isWeb($0.absoluteString) }) == true
+        mobileChrome.update(url: current.url, isPrivate: context.isPrivate, tabCount: context.tabs.count,
+                            canBack: current.webView?.canGoBack == true || !current.url.hasPrefix("sel://") || retained,
+                            canForward: current.webView?.canGoForward == true || retained,
+                            isLoading: current.webView?.isLoading == true && !current.url.hasPrefix("sel://"))
+        mobileChrome.setMenu(makePageMenu())
+        mobileChrome.bindScrollView(BrowserAddress.isWeb(current.url) ? current.webView?.scrollView : nil)
+        overrideUserInterfaceStyle = context.settings.theme == "light" ? .light : .dark
+        view.backgroundColor = .systemBackground
+        refreshTabOverview()
         guard shellReady, let active = context.active else { return }
         let retainedSite = active.url.hasPrefix("sel://") && (active.webView?.url).map({ BrowserAddress.isWeb($0.absoluteString) }) == true
         let state: [String: Any] = [
@@ -288,8 +347,6 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         lastShellJSON = json
         let safeJSON = json.replacingOccurrences(of: "\u{2028}", with: "\\u2028").replacingOccurrences(of: "\u{2029}", with: "\\u2029")
         shell.evaluateJavaScript("window.selApplyState(\(safeJSON));", completionHandler: nil)
-        view.backgroundColor = context.settings.theme == "light" ? UIColor(red: 0.87, green: 0.89, blue: 0.92, alpha: 1) : UIColor(red: 0.10, green: 0.12, blue: 0.14, alpha: 1)
-        overrideUserInterfaceStyle = context.settings.theme == "light" ? .light : .dark
     }
 
     @objc private func backgroundSave() { saveNormalProfile() }
@@ -308,6 +365,233 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         let work = DispatchWorkItem { [weak self] in self?.saveNormalProfile() }
         saveWork = work; DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
     }
+
+    // MARK: Mobile tab library and settings
+    private func showTabOverview() {
+        guard presentedViewController == nil else { return }
+        view.endEditing(true)
+        if let active = context.active { capturePreview(active, owner: context) }
+        let overview = TabOverviewController(isPrivate: context.isPrivate)
+        overview.normalInterfaceStyle = overrideUserInterfaceStyle
+        overview.overrideUserInterfaceStyle = overrideUserInterfaceStyle
+        overview.modalPresentationStyle = .fullScreen
+        tabOverview = overview
+        overview.onSelect = { [weak self, weak overview] id in
+            guard let self = self, let tab = self.context.tabs.first(where: { $0.id == id }) else { return }
+            overview?.dismiss(animated: true) { [weak self, weak tab] in if let tab = tab { self?.select(tab) } }
+        }
+        overview.onClose = { [weak self] id in
+            guard let self = self, let tab = self.context.tabs.first(where: { $0.id == id }) else { return }
+            self.close(tab)
+        }
+        overview.onNewTab = { [weak self, weak overview] in
+            overview?.dismiss(animated: true) { [weak self] in
+                self?.newTab(); self?.mobileChrome.focusAddress()
+            }
+        }
+        overview.onMove = { [weak self] id, target in
+            guard let self = self,
+                  let from = self.context.tabs.firstIndex(where: { $0.id == id }),
+                  let to = self.context.tabs.firstIndex(where: { $0.id == target }), from != to else { return }
+            let tab = self.context.tabs.remove(at: from)
+            self.context.tabs.insert(tab, at: min(to, self.context.tabs.count))
+            self.pushState(); if !self.context.isPrivate { self.scheduleSave() }
+        }
+        overview.onPrivacyChange = { [weak self] isPrivate in
+            guard let self = self else { return }
+            if self.context.isPrivate != isPrivate { self.switchPrivacy() }
+            self.refreshTabOverview()
+        }
+        overview.onCloseAll = { [weak self, weak overview] in
+            guard let self = self, let overview = overview else { return }
+            let owner = self.context!
+            let dialog = UIAlertController(title: owner.isPrivate ? "Закрыть приватные вкладки?" : "Закрыть все вкладки?",
+                                          message: owner.isPrivate ? "Завершится приватный сеанс. Его cookie и история не сохранятся." : "Закрытые страницы можно вернуть через меню браузера.", preferredStyle: .alert)
+            dialog.addAction(UIAlertAction(title: "Отмена", style: .cancel))
+            dialog.addAction(UIAlertAction(title: "Закрыть все", style: .destructive) { [weak self, weak owner] _ in
+                guard let self = self, let owner = owner, self.context === owner else { return }
+                if owner.isPrivate { self.endPrivateSession() }
+                else {
+                    owner.closed.append(contentsOf: owner.tabs.map { SavedTab(id: $0.id, url: $0.url, pinned: $0.pinned) })
+                    owner.closed = Array(owner.closed.suffix(50))
+                    owner.tabs.forEach { $0.dispose() }; owner.tabs.removeAll(); owner.activeID = nil
+                    self.newTab(); self.pushState(); self.scheduleSave()
+                }
+            })
+            overview.present(dialog, animated: true)
+        }
+        overview.onDone = { [weak overview] in overview?.dismiss(animated: true) }
+        overview.onBookmarks = { [weak self, weak overview] in
+            overview?.dismiss(animated: true) { [weak self] in self?.showBookmarks() }
+        }
+        refreshTabOverview()
+        present(overview, animated: true)
+    }
+
+    private func refreshTabOverview() {
+        guard let overview = tabOverview, context != nil else { return }
+        let items = context.tabs.map { tab -> TabOverviewItem in
+            var icon: UIImage?
+            if let separator = tab.favicon.firstIndex(of: ","), tab.favicon.hasPrefix("data:image/"),
+               let data = Data(base64Encoded: String(tab.favicon[tab.favicon.index(after: separator)...])) { icon = UIImage(data: data) }
+            return TabOverviewItem(id: tab.id, title: tab.title, url: tab.url, favicon: icon,
+                                   preview: BrowserAddress.isWeb(tab.url) ? tab.preview : nil,
+                                   selected: context.activeID == tab.id, pinned: tab.pinned)
+        }
+        overview.update(items: items, isPrivate: context.isPrivate)
+    }
+
+    private func capturePreview(_ tab: BrowserTab, owner: BrowserContext) {
+        guard BrowserAddress.isWeb(tab.url), let webView = tab.webView, webView.window != nil,
+              !webView.isHidden, webView.bounds.width > 0, webView.bounds.height > 0,
+              !snapshotsInProgress.contains(tab.id) else { return }
+        let capturedURL = tab.url
+        let capturedID = tab.id
+        let generation = UUID(); tab.previewGeneration = generation
+        snapshotsInProgress.insert(tab.id)
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = webView.bounds
+        configuration.snapshotWidth = NSNumber(value: 220)
+        webView.takeSnapshot(with: configuration) { [weak self, weak tab, weak owner] image, _ in
+            guard let self = self else { return }
+            self.snapshotsInProgress.remove(capturedID)
+            guard let tab = tab else { return }
+            guard let owner = owner, owner.tabs.contains(where: { $0 === tab }),
+                  tab.previewGeneration == generation, tab.url == capturedURL, let image = image else { return }
+            tab.preview = image
+            // Limit thumbnail memory independently of the number of loaded website processes.
+            let recent = Set(self.allContexts.flatMap { $0.tabs }.sorted { $0.lastSelected > $1.lastSelected }.prefix(40).map { $0.id })
+            for context in self.allContexts { for candidate in context.tabs where !recent.contains(candidate.id) { candidate.preview = nil } }
+            self.refreshTabOverview()
+        }
+    }
+
+    private func showSettings() {
+        guard presentedViewController == nil else { return }
+        view.endEditing(true)
+        let settings = MobileSettingsController(settings: context.settings, isPrivate: context.isPrivate)
+        let navigation = UINavigationController(rootViewController: settings)
+        navigation.overrideUserInterfaceStyle = overrideUserInterfaceStyle
+        navigation.modalPresentationStyle = .pageSheet
+        if let sheet = navigation.sheetPresentationController {
+            sheet.detents = [.large()]; sheet.prefersGrabberVisible = true
+            if #available(iOS 26.0, *) {} else { sheet.preferredCornerRadius = 24 }
+        }
+        settings.onSettingsChange = { [weak self, weak navigation] changed in
+            self?.applySettings(changed)
+            navigation?.overrideUserInterfaceStyle = changed.theme == "light" ? .light : .dark
+        }
+        settings.onDone = { [weak navigation] in navigation?.dismiss(animated: true) }
+        settings.onAction = { [weak self, weak navigation] action in
+            navigation?.dismiss(animated: true) { [weak self] in
+                guard let self = self else { return }
+                switch action {
+                case "bookmarks": self.showBookmarks()
+                case "history": self.showHistory()
+                case "downloads": self.showDownloads()
+                case "clearData": self.clearData()
+                case "about": self.showAbout()
+                default: break
+                }
+            }
+        }
+        present(navigation, animated: true)
+    }
+
+    private func applySettings(_ settings: BrowserSettings) {
+        normal.settings = settings
+        privateContext?.settings = settings
+        for owner in allContexts { for tab in owner.tabs { tab.webView?.pageZoom = CGFloat(settings.defaultZoomPercent) / 100 } }
+        lastShellJSON = ""; pushState(); scheduleSave()
+    }
+
+    private func prepareSimulatorPreviewIfRequested() {
+        #if DEBUG
+        guard !didPreparePreview else { return }
+        didPreparePreview = true
+        let arguments = ProcessInfo.processInfo.arguments
+        #if targetEnvironment(simulator)
+        if arguments.contains("--sel-ui-smoke") { runSimulatorSmokeChecks(); return }
+        #endif
+        guard let index = arguments.firstIndex(of: "--sel-ui-preview"), arguments.indices.contains(index + 1) else { return }
+        let screen = arguments[index + 1]
+        if screen == "tabs" {
+            // Only the simulator smoke launch creates these local metadata cards. No website is loaded.
+            let pages = [("https://www.apple.com", "Apple"), ("https://ru.wikipedia.org", "Википедия"), ("https://www.youtube.com", "YouTube")]
+            for (url, title) in pages { let tab = BrowserTab(url: url); tab.title = title; normal.tabs.append(tab) }
+            showTabOverview()
+        } else if screen == "settings" { showSettings() }
+        else if screen == "search" { mobileChrome.focusAddress() }
+        else if screen == "home-dark" { var settings = normal.settings; settings.theme = "dark"; applySettings(settings) }
+        #endif
+    }
+
+    #if DEBUG && targetEnvironment(simulator)
+    private func runSimulatorSmokeChecks() {
+        var checks: [[String: Any]] = []
+        func check(_ name: String, _ passed: Bool) { checks.append(["name": name, "passed": passed]) }
+        func control(_ view: UIView, id: String) -> UIControl? {
+            if view.accessibilityIdentifier == id { return view as? UIControl }
+            for child in view.subviews { if let found = control(child, id: id) { return found } }
+            return nil
+        }
+        func record() {
+            let report: [String: Any] = ["passed": checks.allSatisfy { $0["passed"] as? Bool == true }, "checks": checks]
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("sel-ui-smoke.json")
+            if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: url) }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            guard let self = self else { return }
+            let initial = self.context.active!
+            let left = self.newTab(), middle = self.newTab(), right = self.newTab()
+            self.close(middle)
+            check("Closing a middle tab preserves its neighbours", self.context.tabs.contains { $0 === left } && self.context.tabs.contains { $0 === right } && !self.context.tabs.contains { $0 === middle })
+            check("Closing an inactive tab preserves the selected tab", self.context.activeID == right.id)
+            self.select(left); self.close(right)
+            check("Closing the right tab preserves the selected left tab", self.context.activeID == left.id && !self.context.tabs.contains { $0 === right })
+            self.close(initial); self.close(left)
+            check("Closing the last tab creates a usable new tab", self.context.tabs.count == 1 && self.context.active?.url == "sel://newtab")
+            self.view.layoutIfNeeded()
+            check("Tab control is anchored below page content", self.mobileChrome.footer.frame.minY > self.view.bounds.midY)
+            check("Native navigation reserves safe hit targets", self.mobileChrome.footer.bounds.height >= 44 && self.mobileChrome.header.bounds.height >= 44)
+            check("Browser menu uses a native system menu", (control(self.mobileChrome.footer, id: "mobileMenu") as? UIButton)?.menu != nil)
+            if #available(iOS 26.0, *), !UIAccessibility.isReduceTransparencyEnabled {
+                check("Navigation uses the real Apple UIGlassEffect", self.mobileChrome.footer.effect is UIGlassEffect)
+            } else {
+                check("Older iOS uses a compatible navigation material", self.mobileChrome.footer.effect is UIBlurEffect || UIAccessibility.isReduceTransparencyEnabled)
+            }
+            let original = self.normal.settings
+            var changed = original; changed.searchEngine = "duckduckgo"; changed.defaultZoomPercent = 125
+            self.applySettings(changed)
+            check("Native search selection resolves real search URLs", BrowserAddress.resolve("проверка", engine: self.context.settings.searchEngine)?.hasPrefix("https://duckduckgo.com/") == true)
+            self.switchPrivacy()
+            let normalCount = self.normal.tabs.count
+            self.newTab()
+            check("Private tabs do not modify the normal session", self.normal.tabs.count == normalCount && self.context.isPrivate && self.context.dataStore !== self.normal.dataStore)
+            self.endPrivateSession(); self.applySettings(original)
+            let legacy = #"{"settings":{"theme":"light","searchEngine":"yandex","restoreSession":true,"closeTabBehavior":"right","defaultZoomPercent":100},"bookmarks":[{"id":"old-bookmark","title":"Сохранённая закладка","url":"https://example.com","addedAt":0}],"history":[],"session":[{"id":"old-tab","url":"sel://newtab","pinned":false}],"activeID":"old-tab"}"#
+            let decoded = try? JSONDecoder().decode(BrowserSnapshot.self, from: Data(legacy.utf8))
+            check("Version 1.0 profile format remains readable", decoded?.bookmarks.first?.id == "old-bookmark" && decoded?.session.first?.id == "old-tab")
+            let persisted = (try? JSONEncoder().encode(self.normal.snapshot())).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+            check("Page thumbnails are not serialized to disk", !persisted.isEmpty && !persisted.contains("previewGeneration") && !persisted.contains("\"preview\""))
+            self.shell.evaluateJavaScript("[getComputedStyle(document.getElementById('desktop-tab-strip')).display,getComputedStyle(document.getElementById('desktop-navigation')).display]") { result, _ in
+                check("The desktop top tab strip and toolbar are hidden", (result as? [String]) == ["none", "none"])
+                control(self.mobileChrome.footer, id: "mobileTabs")?.sendActions(for: .touchUpInside)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    check("Bottom tab button opens the native full-screen library", self.presentedViewController is TabOverviewController)
+                    self.dismiss(animated: false) {
+                        control(self.mobileChrome.header, id: "mobileSettings")?.sendActions(for: .touchUpInside)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                            let navigation = self.presentedViewController as? UINavigationController
+                            check("Settings opens a native navigation sheet", navigation?.topViewController is MobileSettingsController)
+                            record()
+                        }
+                    }
+                }
+            }
+        }
+    }
+    #endif
 
     // MARK: Website navigation and UI
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
@@ -342,7 +626,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
             owner.history.insert(HistoryEntry(title: tab.title, url: tab.url), at: 0)
             owner.history = Array(owner.history.prefix(2000)); scheduleSave()
         }
-        updateFavicon(tab, owner: owner); pushState()
+        updateFavicon(tab, owner: owner); capturePreview(tab, owner: owner); pushState()
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
@@ -413,9 +697,43 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
     }
 
     // MARK: Native menus and data views
+    private func makePageMenu() -> UIMenu {
+        func action(_ title: String, _ image: String, destructive: Bool = false, handler: @escaping () -> Void) -> UIAction {
+            UIAction(title: title, image: UIImage(systemName: image), attributes: destructive ? [.destructive] : []) { _ in
+                DispatchQueue.main.async(execute: handler)
+            }
+        }
+        var navigation: [UIMenuElement] = [
+            action("Главная", "house") { [weak self] in self?.navigate("sel://newtab") },
+            action("Новая вкладка", "plus") { [weak self] in self?.newTab(); self?.mobileChrome.focusAddress() },
+            action("Вернуть закрытую вкладку", "arrow.uturn.backward") { [weak self] in self?.restoreClosed() },
+            action(context.isPrivate ? "Обычные вкладки" : "Приватные вкладки", "eyeglasses") { [weak self] in self?.switchPrivacy() }
+        ]
+        if let tab = context.active {
+            navigation.append(action("Дублировать вкладку", "plus.square.on.square") { [weak self, weak tab] in if let tab = tab { self?.newTab(tab.url) } })
+            navigation.append(action(tab.pinned ? "Открепить вкладку" : "Закрепить вкладку", "pin") { [weak self, weak tab] in
+                guard let self = self, let tab = tab else { return }
+                tab.pinned.toggle(); self.pushState(); if !self.context.isPrivate { self.scheduleSave() }
+            })
+        }
+        var page: [UIMenuElement] = []
+        if let text = context.active?.url, BrowserAddress.isWeb(text), let url = URL(string: text) {
+            page.append(action(context.bookmarks.contains(where: { $0.url == text }) ? "Удалить закладку" : "Добавить закладку", "bookmark") { [weak self] in self?.toggleBookmark() })
+            page.append(action("Поделиться", "square.and.arrow.up") { [weak self] in self?.share(url) })
+        }
+        page.append(contentsOf: [
+            action("Закладки", "bookmark") { [weak self] in self?.showBookmarks() },
+            action("История", "clock.arrow.circlepath") { [weak self] in self?.showHistory() },
+            action("Загрузки", "arrow.down.circle") { [weak self] in self?.showDownloads() },
+            action("Настройки", "gearshape") { [weak self] in self?.showSettings() }
+        ])
+        return UIMenu(children: [UIMenu(options: .displayInline, children: navigation), UIMenu(options: .displayInline, children: page)])
+    }
+
     private func showMenu() {
         let menu = UIAlertController(title: context.isPrivate ? "Sel · Приватное окно" : "Sel", message: nil, preferredStyle: .actionSheet)
         add(menu, "Новая вкладка") { [weak self] in self?.newTab() }
+        add(menu, "Главная") { [weak self] in self?.navigate("sel://newtab") }
         add(menu, "Вернуть закрытую вкладку") { [weak self] in self?.restoreClosed() }
         add(menu, context.isPrivate ? "Вернуться в обычные вкладки" : "Приватные вкладки") { [weak self] in self?.switchPrivacy() }
         if context.isPrivate { add(menu, "Закрыть все приватные вкладки", style: .destructive) { [weak self] in self?.endPrivateSession() } }
@@ -424,7 +742,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         add(menu, "История") { [weak self] in self?.showHistory() }
         add(menu, "Загрузки") { [weak self] in self?.showDownloads() }
         if let text = context.active?.url, BrowserAddress.isWeb(text), let url = URL(string: text) { add(menu, "Поделиться страницей") { [weak self] in self?.share(url) } }
-        add(menu, "Настройки") { [weak self] in self?.navigate("sel://settings") }
+        add(menu, "Настройки") { [weak self] in self?.showSettings() }
         add(menu, "Очистить историю, cookie и кеш", style: .destructive) { [weak self] in self?.clearData() }
         add(menu, "О Sel") { [weak self] in self?.showAbout() }
         menu.addAction(UIAlertAction(title: "Отмена", style: .cancel)); presentSheet(menu)
@@ -443,6 +761,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         pushState(); if !context.isPrivate { scheduleSave() }
     }
     private func switchPrivacy() {
+        if let active = context.active { capturePreview(active, owner: context) }
         if context.isPrivate { context = normal }
         else {
             saveNormalProfile()
@@ -482,14 +801,15 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         }
     }
     private func showAbout() {
-        alert("Sel для iOS · 0.1", "Нативные вкладки WebKit / WKWebView. Интерфейс Sel работает локально.\n\nПриватный режим не сохраняет историю и использует временные cookie, но не делает соединения анонимными. Скачанные файлы остаются.\n\nВ этой первой версии нет расширений Chrome, Google Sync, импорта HTML-закладок и управления звуком отдельной вкладки. Памятью iOS управляет WebKit.")
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.1.0"
+        alert("Sel для iOS · \(version)", "Нативные вкладки WebKit / WKWebView. Экран вкладок и настройки адаптированы для iPhone и iPad.\n\nПриватный режим не сохраняет историю и использует временные cookie, но не делает соединения анонимными. Скачанные файлы остаются.\n\nРасширения Chrome и Google Sync не поддерживаются. Памятью сайтов управляют iOS и WebKit.")
     }
     private func add(_ menu: UIAlertController, _ title: String, style: UIAlertAction.Style = .default, action: @escaping () -> Void) {
         menu.addAction(UIAlertAction(title: title, style: style) { _ in DispatchQueue.main.async(execute: action) })
     }
     private func presentSheet(_ menu: UIAlertController) {
         guard presentedViewController == nil else { return }
-        if let popover = menu.popoverPresentationController { popover.sourceView = shell; popover.sourceRect = CGRect(x: max(0, shell.bounds.width - 35), y: 55, width: 25, height: 25) }
+        if let popover = menu.popoverPresentationController { popover.sourceView = mobileChrome.footer; popover.sourceRect = CGRect(x: mobileChrome.footer.bounds.midX, y: 0, width: 1, height: 1) }
         present(menu, animated: true)
     }
     private func alert(_ title: String, _ message: String) {
