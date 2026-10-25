@@ -9,25 +9,32 @@
 		A10000000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		B00000000000000000000001 /* PBXContainerItemProxy */ = {isa = PBXContainerItemProxy; containerPortal = A80000000000000000000001 /* Project object */; proxyType = 1; remoteGlobalIDString = A60000000000000000000001; remoteInfo = SelBrowser; };
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		A20000000000000000000001 /* SelBrowser.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SelBrowser.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A20000000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B20000000000000000000001 /* SelBrowserUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SelBrowserUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A30000000000000000000001 /* Sources */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Sources; sourceTree = "<group>"; };
 		A30000000000000000000002 /* Resources */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Resources; sourceTree = "<group>"; };
+		B30000000000000000000001 /* SelBrowserUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = SelBrowserUITests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A40000000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		B40000000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		A50000000000000000000001 = {isa = PBXGroup; children = (A50000000000000000000002 /* SelBrowser */, A50000000000000000000003 /* Products */,); sourceTree = "<group>"; };
+		A50000000000000000000001 = {isa = PBXGroup; children = (A50000000000000000000002 /* SelBrowser */, B30000000000000000000001 /* SelBrowserUITests */, A50000000000000000000003 /* Products */,); sourceTree = "<group>"; };
 		A50000000000000000000002 /* SelBrowser */ = {isa = PBXGroup; children = (A30000000000000000000001 /* Sources */, A30000000000000000000002 /* Resources */, A20000000000000000000002 /* Assets.xcassets */, A20000000000000000000003 /* Info.plist */,); path = SelBrowser; sourceTree = "<group>"; };
-		A50000000000000000000003 /* Products */ = {isa = PBXGroup; children = (A20000000000000000000001 /* SelBrowser.app */,); name = Products; sourceTree = "<group>"; };
+		A50000000000000000000003 /* Products */ = {isa = PBXGroup; children = (A20000000000000000000001 /* SelBrowser.app */, B20000000000000000000001 /* SelBrowserUITests.xctest */,); name = Products; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -44,12 +51,25 @@
 			productReference = A20000000000000000000001 /* SelBrowser.app */;
 			productType = "com.apple.product-type.application";
 		};
+		B60000000000000000000001 /* SelBrowserUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B90000000000000000000001 /* Build configuration list for PBXNativeTarget SelBrowserUITests */;
+			buildPhases = (B70000000000000000000001 /* Sources */, B40000000000000000000001 /* Frameworks */, B70000000000000000000002 /* Resources */,);
+			buildRules = ();
+			dependencies = (B00000000000000000000002 /* PBXTargetDependency */,);
+			fileSystemSynchronizedGroups = (B30000000000000000000001 /* SelBrowserUITests */,);
+			name = SelBrowserUITests;
+			packageProductDependencies = ();
+			productName = SelBrowserUITests;
+			productReference = B20000000000000000000001 /* SelBrowserUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
 		A80000000000000000000001 /* Project object */ = {
 			isa = PBXProject;
-			attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1600; LastUpgradeCheck = 1600; TargetAttributes = {A60000000000000000000001 = {CreatedOnToolsVersion = 16.0; }; }; };
+			attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1600; LastUpgradeCheck = 1600; TargetAttributes = {A60000000000000000000001 = {CreatedOnToolsVersion = 16.0; }; B60000000000000000000001 = {CreatedOnToolsVersion = 26.0; TestTargetID = A60000000000000000000001; }; }; };
 			buildConfigurationList = A90000000000000000000001 /* Build configuration list for PBXProject SelBrowser */;
 			developmentRegion = ru;
 			hasScannedForEncodings = 0;
@@ -60,17 +80,23 @@
 			productRefGroup = A50000000000000000000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = (A60000000000000000000001 /* SelBrowser */,);
+			targets = (A60000000000000000000001 /* SelBrowser */, B60000000000000000000001 /* SelBrowserUITests */,);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		A70000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001 /* Assets.xcassets in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
+		B70000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		A70000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		B70000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B00000000000000000000002 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = A60000000000000000000001 /* SelBrowser */; targetProxy = B00000000000000000000001 /* PBXContainerItemProxy */; };
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		AA0000000000000000000001 /* Debug */ = {
@@ -85,12 +111,22 @@
 		};
 		AA0000000000000000000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 2; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = SelBrowser/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks",); MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.selbrowser.ios; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_STRICT_CONCURRENCY = minimal; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; };
+			buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 3; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = SelBrowser/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks",); MARKETING_VERSION = 1.1.1; PRODUCT_BUNDLE_IDENTIFIER = com.selbrowser.ios; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_STRICT_CONCURRENCY = minimal; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; };
 			name = Debug;
 		};
 		AA0000000000000000000004 /* Release */ = {
 			isa = XCBuildConfiguration;
-			buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 2; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = SelBrowser/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks",); MARKETING_VERSION = 1.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.selbrowser.ios; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_STRICT_CONCURRENCY = minimal; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; };
+			buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 3; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = SelBrowser/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks",); MARKETING_VERSION = 1.1.1; PRODUCT_BUNDLE_IDENTIFIER = com.selbrowser.ios; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_STRICT_CONCURRENCY = minimal; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; };
+			name = Release;
+		};
+		BA0000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks",); PRODUCT_BUNDLE_IDENTIFIER = com.selbrowser.ios.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_STRICT_CONCURRENCY = minimal; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; TEST_TARGET_NAME = SelBrowser; };
+			name = Debug;
+		};
+		BA0000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 16.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks",); PRODUCT_BUNDLE_IDENTIFIER = com.selbrowser.ios.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_STRICT_CONCURRENCY = minimal; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; TEST_TARGET_NAME = SelBrowser; };
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
@@ -98,6 +134,7 @@
 /* Begin XCConfigurationList section */
 		A90000000000000000000001 /* Build configuration list for PBXProject SelBrowser */ = {isa = XCConfigurationList; buildConfigurations = (AA0000000000000000000001 /* Debug */, AA0000000000000000000002 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		A90000000000000000000002 /* Build configuration list for PBXNativeTarget SelBrowser */ = {isa = XCConfigurationList; buildConfigurations = (AA0000000000000000000003 /* Debug */, AA0000000000000000000004 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		B90000000000000000000001 /* Build configuration list for PBXNativeTarget SelBrowserUITests */ = {isa = XCConfigurationList; buildConfigurations = (BA0000000000000000000001 /* Debug */, BA0000000000000000000002 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 /* End XCConfigurationList section */
 	};
 	rootObject = A80000000000000000000001 /* Project object */;
