@@ -1,6 +1,6 @@
 import UIKit
 
-/// Native controls stay above WKWebView and do not expose the trusted shell bridge to sites.
+/// Native controls occupy their own layout bands, outside the website viewport.
 @MainActor final class MobileBrowserChrome: NSObject, UITextFieldDelegate {
     let header = UIVisualEffectView(effect: BrowserGlass.containerEffect())
     let footer = BrowserGlassView(interactive: true)
@@ -19,7 +19,6 @@ import UIKit
     private var settingsWidth: NSLayoutConstraint!
     private var addressHeight: NSLayoutConstraint!
     private var headerRow: UIStackView!
-    private weak var edgeScrollView: UIScrollView?
     var onNavigate: ((String) -> Void)?
     var onBack: (() -> Void)?
     var onForward: (() -> Void)?
@@ -42,6 +41,7 @@ import UIKit
 
     @objc private func updateTextMetrics() {
         addressHeight.constant = preferredHeaderHeight
+        addressField.font = .preferredFont(forTextStyle: .body)
         onMetricsChange?(preferredHeaderHeight)
     }
 
@@ -49,7 +49,8 @@ import UIKit
         header.translatesAutoresizingMaskIntoConstraints = false
         header.accessibilityIdentifier = "mobileHeader"
         headerRow = UIStackView(arrangedSubviews: [addressPill, settingsButton])
-        headerRow.axis = .horizontal; headerRow.spacing = 10; headerRow.alignment = .center
+        headerRow.axis = .horizontal; headerRow.spacing = 8; headerRow.alignment = .center
+        headerRow.distribution = .fill
         headerRow.translatesAutoresizingMaskIntoConstraints = false
         header.contentView.addSubview(headerRow)
         addressHeight = addressPill.heightAnchor.constraint(equalToConstant: preferredHeaderHeight)
@@ -64,10 +65,18 @@ import UIKit
         securityIcon.tintColor = .secondaryLabel
         securityIcon.translatesAutoresizingMaskIntoConstraints = false
         securityIcon.isAccessibilityElement = false
+        addressPill.contentView.clipsToBounds = true
         addressField.translatesAutoresizingMaskIntoConstraints = false
+        addressField.clipsToBounds = true
         addressField.font = .preferredFont(forTextStyle: .body)
         addressField.adjustsFontForContentSizeCategory = true
-        addressField.placeholder = "Поиск или адрес сайта"
+        addressField.adjustsFontSizeToFitWidth = false
+        addressField.textColor = .label
+        addressField.tintColor = .systemBlue
+        addressField.backgroundColor = .clear
+        addressField.borderStyle = .none
+        addressField.textAlignment = .natural
+        setAddressPlaceholder("Поиск или адрес сайта")
         addressField.accessibilityLabel = "Поиск или адрес сайта"
         addressField.accessibilityIdentifier = "mobileAddress"
         addressField.keyboardType = .webSearch
@@ -77,16 +86,21 @@ import UIKit
         addressField.spellCheckingType = .no
         addressField.smartQuotesType = .no; addressField.smartDashesType = .no
         addressField.clearButtonMode = .whileEditing
+        // The browser does not add a second toolbar to the address keyboard.
+        addressField.inputAccessoryView = nil
+        addressField.inputAssistantItem.leadingBarButtonGroups = []
+        addressField.inputAssistantItem.trailingBarButtonGroups = []
+        addressField.inputAssistantItem.allowsHidingShortcuts = true
         addressField.delegate = self
         addressField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         addressPill.contentView.addSubview(securityIcon)
         addressPill.contentView.addSubview(addressField)
         NSLayoutConstraint.activate([
-            securityIcon.leadingAnchor.constraint(equalTo: addressPill.contentView.leadingAnchor, constant: 16),
+            securityIcon.leadingAnchor.constraint(equalTo: addressPill.contentView.leadingAnchor, constant: 14),
             securityIcon.centerYAnchor.constraint(equalTo: addressPill.contentView.centerYAnchor),
             securityIcon.widthAnchor.constraint(equalToConstant: 18),
             securityIcon.heightAnchor.constraint(equalToConstant: 18),
-            addressField.leadingAnchor.constraint(equalTo: securityIcon.trailingAnchor, constant: 10),
+            addressField.leadingAnchor.constraint(equalTo: securityIcon.trailingAnchor, constant: 8),
             addressField.trailingAnchor.constraint(equalTo: addressPill.contentView.trailingAnchor, constant: -14),
             addressField.topAnchor.constraint(equalTo: addressPill.contentView.topAnchor, constant: 4),
             addressField.bottomAnchor.constraint(equalTo: addressPill.contentView.bottomAnchor, constant: -4)
@@ -98,8 +112,9 @@ import UIKit
         }
         settingsButton.configuration = profile
         settingsWidth = settingsButton.widthAnchor.constraint(equalToConstant: 48)
-        settingsWidth.priority = .defaultHigh
         settingsWidth.isActive = true
+        settingsButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        settingsButton.setContentHuggingPriority(.required, for: .horizontal)
         settingsButton.heightAnchor.constraint(equalToConstant: 48).isActive = true
         settingsButton.accessibilityLabel = "Открыть настройки Sel"
         settingsButton.accessibilityIdentifier = "mobileSettings"
@@ -157,18 +172,20 @@ import UIKit
 
     func setMenu(_ menu: UIMenu) { menuButton.menu = menu }
 
-    func bindScrollView(_ scrollView: UIScrollView?) {
-        guard edgeScrollView !== scrollView else { return }
-        edgeScrollView = scrollView
-        if #available(iOS 26.0, *) {
-            for target in [header, footer] {
-                for interaction in target.interactions where interaction is UIScrollEdgeElementContainerInteraction { target.removeInteraction(interaction) }
-            }
-            guard let scrollView = scrollView else { return }
-            let top = UIScrollEdgeElementContainerInteraction(); top.scrollView = scrollView; top.edge = .top
-            let bottom = UIScrollEdgeElementContainerInteraction(); bottom.scrollView = scrollView; bottom.edge = .bottom
-            header.addInteraction(top); footer.addInteraction(bottom)
-        }
+    func setKeyboardVisible(_ visible: Bool) {
+        // The host keeps this band at the device's bottom edge; it never floats over a form.
+        footer.isHidden = visible
+        footer.alpha = visible ? 0 : 1
+        footer.isUserInteractionEnabled = !visible
+        footer.accessibilityElementsHidden = visible
+    }
+
+    // Kept as a host integration point. Content no longer scrolls underneath the controls,
+    // so scroll-edge effects would create unnecessary translucent layers.
+    func bindScrollView(_ scrollView: UIScrollView?) {}
+
+    private func setAddressPlaceholder(_ value: String) {
+        addressField.attributedPlaceholder = NSAttributedString(string: value, attributes: [.foregroundColor: UIColor.secondaryLabel])
     }
 
     func update(url: String, isPrivate: Bool, tabCount: Int, canBack: Bool, canForward: Bool, isLoading: Bool) {
@@ -182,7 +199,7 @@ import UIKit
         tabsButton.accessibilityValue = "\(tabCount) открытых вкладок" + (isPrivate ? ", приватный режим" : "")
         settingsButton.configuration?.title = isPrivate ? nil : "S"
         settingsButton.configuration?.image = isPrivate ? UIImage(systemName: "eyeglasses") : nil
-        addressField.placeholder = isPrivate ? "Приватный поиск или адрес" : "Поиск или адрес сайта"
+        setAddressPlaceholder(isPrivate ? "Приватный поиск или адрес" : "Поиск или адрес сайта")
         let secure = URL(string: url)?.scheme?.lowercased() == "https"
         securityIcon.image = UIImage(systemName: isPrivate ? "eyeglasses" : secure ? "lock.fill" : BrowserAddress.isWeb(url) ? "exclamationmark.circle" : "magnifyingglass")
         addressField.accessibilityHint = secure ? "Соединение с сайтом использует HTTPS" : "Введите поисковый запрос или полный адрес"
@@ -196,20 +213,15 @@ import UIKit
 
     func textFieldDidBeginEditing(_ textField: UITextField) {
         textField.text = BrowserAddress.isWeb(currentURL) ? currentURL : ""
-        BrowserGlass.animate { [weak self] in
-            guard let self = self else { return }
-            self.settingsButton.alpha = 0; self.settingsButton.isHidden = true
-            self.header.layoutIfNeeded()
+        // Keep the settings button's reserved column stable while entering an address.
+        // Collapsing it inside the glass stack caused competing widths during keyboard layout.
+        DispatchQueue.main.async { [weak textField] in
+            guard textField?.isFirstResponder == true else { return }
+            textField?.selectAll(nil)
         }
-        DispatchQueue.main.async { [weak textField] in textField?.selectAll(nil) }
     }
     func textFieldDidEndEditing(_ textField: UITextField) {
         textField.text = displayAddress(currentURL)
-        BrowserGlass.animate { [weak self] in
-            guard let self = self else { return }
-            self.settingsButton.isHidden = false; self.settingsButton.alpha = 1
-            self.header.layoutIfNeeded()
-        }
     }
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         let value = textField.text ?? ""

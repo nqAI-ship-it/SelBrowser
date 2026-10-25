@@ -16,6 +16,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
     private var privateContext: BrowserContext?
     private var context: BrowserContext!
     private let container = UIView()
+    private let headerBackground = UIView()
+    private let footerBackground = UIView()
     private var shell: WKWebView!
     private var shellURL: URL?
     private var shellReady = false
@@ -28,24 +30,57 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
     private var storageErrorShown = false
     private let mobileChrome = MobileBrowserChrome()
     private var headerHeight: NSLayoutConstraint!
+    private var contentBottomToFooter: NSLayoutConstraint!
+    private var contentBottomToKeyboard: NSLayoutConstraint!
+    private var keyboardVisible = false
     private weak var tabOverview: TabOverviewController?
     private var snapshotsInProgress = Set<String>()
     private var didPreparePreview = false
+    #if DEBUG
+    private var simulatorFixtureFocus: String?
+    #endif
+    private var usesSimulatorFixture: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        let arguments = ProcessInfo.processInfo.arguments
+        return arguments.contains("--sel-ui-preview") || arguments.contains("--sel-ui-smoke")
+        #else
+        return false
+        #endif
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
         view.accessibilityIdentifier = "selMobileBrowser"
         container.translatesAutoresizingMaskIntoConstraints = false
+        container.accessibilityIdentifier = "mobileWebContent"
+        container.clipsToBounds = true
+        for background in [headerBackground, footerBackground] {
+            background.translatesAutoresizingMaskIntoConstraints = false
+            background.backgroundColor = .systemBackground
+            view.addSubview(background)
+        }
         view.addSubview(container)
         configureMobileChrome()
+        contentBottomToFooter = container.bottomAnchor.constraint(equalTo: mobileChrome.footer.topAnchor, constant: -8)
+        contentBottomToKeyboard = container.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor)
+        contentBottomToKeyboard.priority = .defaultHigh
         NSLayoutConstraint.activate([
             container.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
             container.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
-            container.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            container.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            container.topAnchor.constraint(equalTo: mobileChrome.header.bottomAnchor, constant: 8),
+            container.heightAnchor.constraint(greaterThanOrEqualToConstant: 0),
+            contentBottomToFooter,
+            headerBackground.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            headerBackground.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            headerBackground.topAnchor.constraint(equalTo: view.topAnchor),
+            headerBackground.bottomAnchor.constraint(equalTo: container.topAnchor),
+            footerBackground.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            footerBackground.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            footerBackground.topAnchor.constraint(equalTo: mobileChrome.footer.topAnchor, constant: -8),
+            footerBackground.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
-        let saved = storage.load()
+        let saved = usesSimulatorFixture ? BrowserSnapshot() : storage.load()
         normal = BrowserContext(isPrivate: false, settings: saved.settings, bookmarks: saved.bookmarks, history: saved.history)
         context = normal
         if saved.settings.restoreSession {
@@ -58,6 +93,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         configureShell()
         if let tab = context.active { select(tab) }
         NotificationCenter.default.addObserver(self, selector: #selector(backgroundSave), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardFrameWillChange), name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardFrameWillChange), name: UIResponder.keyboardWillHideNotification, object: nil)
     }
 
     deinit {
@@ -66,9 +103,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        let top = max(0, mobileChrome.header.frame.maxY - container.frame.minY + 8)
-        let bottom = max(top, mobileChrome.footer.frame.minY - container.frame.minY - 8)
-        shell?.frame = CGRect(x: 0, y: top, width: container.bounds.width, height: bottom - top)
+        shell?.frame = container.bounds
         layoutWebsiteViews()
     }
 
@@ -94,8 +129,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
             headerHeight,
             mobileChrome.footer.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 14),
             mobileChrome.footer.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -14),
-            mobileChrome.footer.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -8),
-            mobileChrome.footer.heightAnchor.constraint(equalToConstant: 56)
+            mobileChrome.footer.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -6),
+            mobileChrome.footer.heightAnchor.constraint(equalToConstant: 52)
         ])
         mobileChrome.onNavigate = { [weak self] value in self?.navigate(value) }
         mobileChrome.onBack = { [weak self] in self?.handle("back", body: [:]) }
@@ -111,11 +146,37 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         }
     }
 
+    @objc private func keyboardFrameWillChange(_ notification: Notification) {
+        guard isViewLoaded, view.window != nil,
+              let endFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+        guard let window = view.window else { return }
+        let screen = (notification.object as? UIScreen) ?? window.screen
+        guard screen === window.screen else { return }
+        let keyboardFrame = screen.coordinateSpace.convert(endFrame, to: view)
+        // A floating iPad keyboard must not move the entire browser viewport.
+        let docked = keyboardFrame.width >= view.bounds.width * 0.7 && keyboardFrame.maxY >= view.bounds.maxY - 1
+        let visible = notification.name != UIResponder.keyboardWillHideNotification && docked &&
+            keyboardFrame.minY < view.bounds.maxY - max(view.safeAreaInsets.bottom, 1)
+        if visible != keyboardVisible {
+            keyboardVisible = visible
+            NSLayoutConstraint.deactivate([contentBottomToFooter, contentBottomToKeyboard])
+            (visible ? contentBottomToKeyboard : contentBottomToFooter).isActive = true
+            mobileChrome.setKeyboardVisible(visible)
+            footerBackground.isHidden = visible
+        }
+        let duration = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
+        let curve = (notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt) ?? 7
+        UIView.animate(withDuration: UIAccessibility.isReduceMotionEnabled ? 0 : duration, delay: 0,
+                       options: [UIView.AnimationOptions(rawValue: curve << 16), .beginFromCurrentState, .allowUserInteraction]) {
+            self.view.layoutIfNeeded()
+        }
+    }
+
     private func configureShell() {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         configuration.userContentController.add(WeakMessageHandler(self), name: "sel")
-        shell = WKWebView(frame: container.bounds, configuration: configuration)
+        shell = BrowserWebView(frame: container.bounds, configuration: configuration)
         shell.navigationDelegate = self
         shell.uiDelegate = self
         shell.scrollView.isScrollEnabled = false
@@ -133,12 +194,10 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
 
     private func layoutWebsiteViews() {
         contentBounds = container.bounds
-        let top = max(0, mobileChrome.header.frame.maxY - container.frame.minY + 8)
-        let bottom = max(view.safeAreaInsets.bottom, container.frame.maxY - mobileChrome.footer.frame.minY + 8)
         for c in allContexts { for tab in c.tabs {
             tab.webView?.frame = container.bounds
-            tab.webView?.scrollView.contentInset = UIEdgeInsets(top: top, left: 0, bottom: bottom, right: 0)
-            tab.webView?.scrollView.verticalScrollIndicatorInsets = UIEdgeInsets(top: top, left: 0, bottom: bottom, right: 0)
+            tab.webView?.scrollView.contentInset = .zero
+            tab.webView?.scrollView.verticalScrollIndicatorInsets = .zero
         } }
     }
 
@@ -160,7 +219,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         configuration.userContentController.removeScriptMessageHandler(forName: "sel")
         configuration.allowsInlineMediaPlayback = true
         configuration.defaultWebpagePreferences.preferredContentMode = .mobile
-        let webView = WKWebView(frame: contentBounds, configuration: configuration)
+        let webView = BrowserWebView(frame: contentBounds, configuration: configuration)
         webView.navigationDelegate = self; webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
@@ -360,7 +419,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
 
     @objc private func backgroundSave() { saveNormalProfile() }
     func saveNormalProfile() {
-        guard normal != nil else { return }
+        guard normal != nil, !usesSimulatorFixture else { return }
         do { try storage.save(normal.snapshot()) }
         catch {
             if !storageErrorShown {
@@ -526,7 +585,9 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         #endif
         guard let index = arguments.firstIndex(of: "--sel-ui-preview"), arguments.indices.contains(index + 1) else { return }
         let screen = arguments[index + 1]
-        if screen == "tabs" || screen == "tabs-search" {
+        if ["page", "page-dark", "form", "address-long"].contains(screen) {
+            showSimulatorFixture(screen)
+        } else if screen == "tabs" || screen == "tabs-search" {
             // Only the simulator smoke launch creates these local metadata cards. No website is loaded.
             let pages = [("https://www.apple.com", "Apple"), ("https://ru.wikipedia.org", "Википедия"), ("https://www.youtube.com", "YouTube")]
             for (url, title) in pages { let tab = BrowserTab(url: url); tab.title = title; normal.tabs.append(tab) }
@@ -539,6 +600,41 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         else if screen == "home-dark" { var settings = normal.settings; settings.theme = "dark"; applySettings(settings) }
         #endif
     }
+
+    #if DEBUG
+    private func showSimulatorFixture(_ screen: String) {
+        var settings = normal.settings
+        settings.theme = screen == "page-dark" || screen == "form" || screen == "address-long" ? "dark" : "light"
+        applySettings(settings)
+        let address = "https://sel-preview.invalid/search?text=проверка-длинного-адреса-и-мобильного-поиска"
+        guard let url = URL(string: address) else { return }
+        let tab = BrowserTab(url: url.absoluteString)
+        context.tabs.append(tab)
+        let webView = makeWebsiteView(for: tab, in: context)
+        tab.hasLoaded = true
+        select(tab)
+        simulatorFixtureFocus = screen == "form" ? "form" : screen == "address-long" ? "address" : nil
+        webView.loadHTMLString("""
+        <!doctype html><html lang="ru"><head><meta name="viewport" content="width=device-width,initial-scale=1">
+        <meta name="color-scheme" content="light dark"><title>Проверка мобильного поиска</title><style>
+        *{box-sizing:border-box}html{color-scheme:light dark}body{margin:0;font:17px -apple-system,sans-serif;background:#f4f6fa;color:#172335}
+        header{position:sticky;top:0;background:#fff;padding:14px 16px;border-bottom:1px solid #ddd;z-index:2}
+        form{display:flex;gap:8px;align-items:center}input{font:17px -apple-system;min-width:0;width:100%;padding:12px;border:1px solid #9ba6b5;border-radius:12px;color:inherit;background:transparent}
+        button{font:16px -apple-system;background:#ed5a45;color:white;border:0;padding:13px;border-radius:12px;flex-shrink:0}
+        nav{display:flex;gap:20px;overflow-x:auto;white-space:nowrap;padding-top:16px;font-size:14px}main{padding:22px 18px}article{padding:18px 0;border-bottom:1px solid #8893a533}
+        h1{font-size:24px;margin:0 0 12px}h2{font-size:21px;color:#4077df}p{line-height:1.65;margin:12px 0}small{color:#7a8799}
+        @media(prefers-color-scheme:dark){body{background:#111317;color:#e3e8ef}header{background:#191c22;border-color:#343a46}h2{color:#94b9ff}}
+        </style></head><body><header><form onsubmit="event.preventDefault()"><input id="fixture-query" aria-label="Поиск на странице" placeholder="Поиск на странице" value="subway surf"><button>Найти</button></form>
+        <nav><b>Поиск</b><span>Картинки</span><span>Видео</span><span>Карты</span></nav></header><main><small>Локальная проверка отображения сайта</small>
+        <article><h1>Мобильный поиск</h1><p>Текст страницы начинается под панелью браузера и не проходит под адресной строкой.</p></article>
+        <article><h2>Результат поиска</h2><p>Нижняя навигация остаётся у края экрана. Во время ввода она скрывается и освобождает место для страницы.</p></article>
+        <article><h2>Ещё один результат</h2><p>Поле поиска использует настоящую клавиатуру iOS. Дополнительная панель перехода между полями отключена.</p></article>
+        <article><h2>Продолжение страницы</h2><p>Прокрутите страницу: её содержимое ограничено областью просмотра WebKit.</p></article>
+        <article><h2>Конец страницы</h2><p>Эти данные созданы только для проверки интерфейса и не требуют подключения к сайту.</p></article>
+        </main></body></html>
+        """, baseURL: url)
+    }
+    #endif
 
     #if DEBUG && targetEnvironment(simulator)
     private func runSimulatorSmokeChecks() {
@@ -567,6 +663,15 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
             check("Closing the last tab creates a usable new tab", self.context.tabs.count == 1 && self.context.active?.url == "sel://newtab")
             self.view.layoutIfNeeded()
             check("Tab control is anchored below page content", self.mobileChrome.footer.frame.minY > self.view.bounds.midY)
+            check("Website viewport cannot overlap the address controls", self.container.frame.minY >= self.mobileChrome.header.frame.maxY + 7)
+            check("Website viewport stays above the bottom navigation", self.container.frame.maxY <= self.mobileChrome.footer.frame.minY - 7)
+            check("Bottom navigation stays at the safe-area edge", abs(self.mobileChrome.footer.frame.maxY - self.view.safeAreaLayoutGuide.layoutFrame.maxY + 6) < 1)
+            check("Website content is clipped to its own viewport", self.container.clipsToBounds)
+            if let profile = control(self.mobileChrome.header, id: "mobileSettings") {
+                let addressFrame = self.mobileChrome.addressField.convert(self.mobileChrome.addressField.bounds, to: self.view)
+                let profileFrame = profile.convert(profile.bounds, to: self.view)
+                check("Address text and profile button have separate layout columns", !addressFrame.intersects(profileFrame))
+            }
             check("Native navigation reserves safe hit targets", self.mobileChrome.footer.bounds.height >= 44 && self.mobileChrome.header.bounds.height >= 44)
             check("Browser menu uses a native system menu", (control(self.mobileChrome.footer, id: "mobileMenu") as? UIButton)?.menu != nil)
             if #available(iOS 26.0, *), !UIAccessibility.isReduceTransparencyEnabled {
@@ -599,7 +704,20 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                             let navigation = self.presentedViewController as? UINavigationController
                             check("Settings opens a native navigation sheet", navigation?.topViewController is MobileSettingsController)
-                            record()
+                            self.dismiss(animated: false) {
+                                self.mobileChrome.focusAddress()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                    self.view.layoutIfNeeded()
+                                    check("Keyboard hides browser navigation instead of raising it", self.keyboardVisible && self.mobileChrome.footer.isHidden)
+                                    check("Keyboard leaves the page inside the available viewport", self.container.frame.maxY <= self.view.keyboardLayoutGuide.layoutFrame.minY + 1)
+                                    check("Address keyboard has no additional accessory toolbar", self.mobileChrome.addressField.inputAccessoryView == nil)
+                                    self.view.endEditing(true)
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                                        check("Navigation returns after keyboard dismissal", !self.keyboardVisible && !self.mobileChrome.footer.isHidden)
+                                        record()
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -636,6 +754,19 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         guard webView !== shell, let tab = tab(for: webView), !tab.url.hasPrefix("sel://"), let owner = context(for: webView) else { return }
         if let title = webView.title, !title.isEmpty { tab.title = String(title.prefix(512)) }
         if let url = webView.url?.absoluteString { tab.url = url }
+        #if DEBUG
+        if webView.url?.host == "sel-preview.invalid" {
+            capturePreview(tab, owner: owner); pushState()
+            if simulatorFixtureFocus == "form" {
+                simulatorFixtureFocus = nil
+                webView.evaluateJavaScript("document.getElementById('fixture-query').focus()", completionHandler: nil)
+            } else if simulatorFixtureFocus == "address" {
+                simulatorFixtureFocus = nil
+                mobileChrome.focusAddress()
+            }
+            return
+        }
+        #endif
         if !owner.isPrivate, BrowserAddress.isWeb(tab.url) {
             owner.history.removeAll { $0.url == tab.url }
             owner.history.insert(HistoryEntry(title: tab.title, url: tab.url), at: 0)
