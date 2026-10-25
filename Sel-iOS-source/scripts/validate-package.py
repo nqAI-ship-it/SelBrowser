@@ -17,6 +17,10 @@ required = [
     "SelBrowser/Sources/BrowserModels.swift",
     "SelBrowser/Sources/BrowserViewController.swift",
     "SelBrowser/Sources/BoundedIconRequest.swift",
+    "SelBrowser/Sources/BrowserGlass.swift",
+    "SelBrowser/Sources/MobileBrowserChrome.swift",
+    "SelBrowser/Sources/TabOverviewController.swift",
+    "SelBrowser/Sources/MobileSettingsController.swift",
     "SelBrowser/Resources/Shell.html",
     "SelBrowser/Resources/tailwind.js",
     "SelBrowser/Resources/lucide.js",
@@ -42,6 +46,9 @@ references = set(re.findall(r"\b[A-F0-9]{24}\b", project))
 assert references.issubset(definitions), f"Undefined Xcode objects: {references - set(definitions)}"
 assert "fileSystemSynchronizedGroups" in project
 assert "IPHONEOS_DEPLOYMENT_TARGET = 16.0" in project
+assert project.count("PRODUCT_BUNDLE_IDENTIFIER = com.selbrowser.ios;") == 2, "Keep the installed app's identity across updates"
+assert project.count("MARKETING_VERSION = 1.1.0;") == 2
+assert project.count("CURRENT_PROJECT_VERSION = 2;") == 2
 scheme = ET.parse(root / "SelBrowser.xcodeproj/xcshareddata/xcschemes/SelBrowser.xcscheme")
 for buildable in scheme.findall(".//BuildableReference"):
     assert buildable.attrib["BlueprintIdentifier"] in definitions
@@ -63,6 +70,11 @@ assert "runs-on: macos-15" in workflow
 assert "github.event.repository.private == false" in workflow
 assert "secrets." not in workflow
 assert "SelBrowser-unsigned-IPA" in workflow
+assert "capture-ios-previews.sh" in workflow
+assert "SelBrowser-iOS-previews" in workflow
+preview_script = (root / "scripts/capture-ios-previews.sh").read_bytes()
+assert b"\r" not in preview_script, "Simulator script must use Unix LF line endings"
+assert b"--sel-ui-preview" in preview_script
 script = (root / "scripts/build-ios.sh").read_bytes()
 assert b"\r" not in script, "Build script must use Unix LF line endings"
 assert b"CODE_SIGNING_ALLOWED=NO" in script
