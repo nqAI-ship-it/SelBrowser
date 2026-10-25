@@ -24,6 +24,8 @@ jobs:
     if: ${{ github.event.repository.private == false }}
     name: Compile and package unsigned iPhone app
     runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     timeout-minutes: 30
     steps:
       - name: Download this repository
@@ -58,6 +60,10 @@ jobs:
           node scripts/validate-shell.mjs
           bash scripts/build-ios.sh --simulator-only
 
+      - name: Launch iPhone and iPad UI previews
+        working-directory: ${{ env.IOS_ROOT }}
+        run: bash scripts/capture-ios-previews.sh
+
       - name: Compile and package for iPhone without signing
         working-directory: ${{ env.IOS_ROOT }}
         run: bash scripts/build-ios.sh
@@ -70,6 +76,15 @@ jobs:
             ${{ env.IOS_ROOT }}/dist/SelBrowser-unsigned.ipa
             ${{ env.IOS_ROOT }}/dist/SelBrowser-unsigned.ipa.sha256
           if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload iOS UI previews
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: SelBrowser-iOS-previews
+          path: ${{ env.IOS_ROOT }}/build-logs/previews/
+          if-no-files-found: warn
           retention-days: 7
 
       - name: Upload build logs
