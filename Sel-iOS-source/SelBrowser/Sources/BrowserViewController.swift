@@ -264,7 +264,9 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         let value = body["value"].map { String(describing: $0) } ?? ""
         let extra = body["extra"]
         switch action {
-        case "ready": shellReady = true; lastShellJSON = ""; pushState()
+        case "ready":
+            shellReady = true; lastShellJSON = ""; pushState()
+            prepareSimulatorPreviewIfRequested()
         case "bounds":
             // The iOS host owns the entire page rectangle; HTML never positions browser controls.
             layoutWebsiteViews()
@@ -509,7 +511,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
 
     private func prepareSimulatorPreviewIfRequested() {
         #if DEBUG
-        guard !didPreparePreview else { return }
+        // A cold simulator can finish presenting UIKit before WebKit has loaded the local shell.
+        guard !didPreparePreview, shellReady, viewIfLoaded?.window != nil else { return }
         didPreparePreview = true
         let arguments = ProcessInfo.processInfo.arguments
         #if targetEnvironment(simulator)
@@ -576,7 +579,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
             check("Version 1.0 profile format remains readable", decoded?.bookmarks.first?.id == "old-bookmark" && decoded?.session.first?.id == "old-tab")
             let persisted = (try? JSONEncoder().encode(self.normal.snapshot())).flatMap { String(data: $0, encoding: .utf8) } ?? ""
             check("Page thumbnails are not serialized to disk", !persisted.isEmpty && !persisted.contains("previewGeneration") && !persisted.contains("\"preview\""))
-            self.shell.evaluateJavaScript("[getComputedStyle(document.getElementById('desktop-tab-strip')).display,getComputedStyle(document.getElementById('desktop-navigation')).display]") { result, _ in
+            self.shell.evaluateJavaScript("[getComputedStyle(document.getElementById('desktop-tab-strip')).display,getComputedStyle(document.getElementById('desktop-navigation')).display]") { result, error in
+                if let error = error { checks.append(["name": "Local shell evaluation", "passed": false, "error": error.localizedDescription]) }
                 check("The desktop top tab strip and toolbar are hidden", (result as? [String]) == ["none", "none"])
                 control(self.mobileChrome.footer, id: "mobileTabs")?.sendActions(for: .touchUpInside)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
