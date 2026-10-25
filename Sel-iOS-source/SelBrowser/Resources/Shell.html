@@ -102,29 +102,66 @@
         ::-webkit-scrollbar-thumb:hover { background: rgba(150, 150, 150, 0.5); }
     </style>
     <style id="sel-ios-adaptation">
-        html,body{height:100%;overscroll-behavior:none;-webkit-text-size-adjust:100%}
+        html,body{height:100%;width:100%;min-width:0;overscroll-behavior:none;-webkit-text-size-adjust:100%}
         input[type=search],select,input[type=number]{font-size:16px!important}
         .drag-region,#tabs-container,.no-drag,.tab-element{-webkit-app-region:no-drag;app-region:no-drag}
+        /* UIKit owns navigation and the bottom tab library on iPhone and iPad. */
+        #desktop-tab-strip,#desktop-navigation,#browser-menu{display:none!important}
+        #content-area{width:100%;height:100%;min-height:0;min-width:0;overflow:hidden}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
         #setting-memory-saver,#setting-suspend-after{display:none}
+        #view-newtab{display:block;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;background:var(--bg-main);color:var(--text-main);padding:0}
+        #view-newtab.hidden,#home-bookmarks.hidden,#private-note.hidden,#home-bookmarks-empty.hidden{display:none}
+        #view-newtab *{box-sizing:border-box;min-width:0}
+        .home-layout{width:100%;max-width:780px;margin:0 auto;padding:28px 20px 24px;display:flex;flex-direction:column;gap:26px}
+        .home-intro{display:flex;flex-direction:column;align-items:flex-start;gap:7px}
+        #logo-container{margin:0 0 13px!important;max-width:100%}
+        #default-logo svg{flex:none}
+        #sport-logo .text-4xl{font-size:clamp(18px,5vw,28px);letter-spacing:.02em}
+        #sport-logo .w-12{width:32px;height:32px;flex:none}
+        #home-title{font-size:clamp(25px,6vw,32px);font-weight:700;letter-spacing:-.035em;line-height:1.15;margin:0}
+        .home-subtitle{font-size:14px;line-height:1.5;color:var(--text-muted);margin:0}
+        .home-search{display:flex;align-items:center;gap:10px;width:100%;min-height:58px;padding:6px 7px 6px 16px;border:1px solid var(--border-color);border-radius:20px;background:var(--bg-nav);box-shadow:0 5px 18px rgba(15,23,42,.045);margin:0}
+        .home-search>svg{width:20px;height:20px;flex:none;color:var(--text-muted)}
+        #main-search-input{display:block;flex:1;width:0;min-width:0;max-width:100%;height:44px;padding:0;border:0;outline:0;border-radius:0;background:transparent;color:var(--text-main);font-family:inherit;font-size:16px;line-height:normal;box-shadow:none;appearance:none;-webkit-appearance:none}
+        #main-search-input::placeholder{color:var(--text-muted);opacity:1}
+        .home-search:focus-within{border-color:var(--accent-color);box-shadow:0 0 0 3px rgba(59,130,246,.12);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent-color) 12%,transparent)}
+        .home-search>button{display:grid;place-items:center;flex:none;width:44px;height:44px;border:0;border-radius:15px;background:var(--accent-color);color:#fff;padding:0}
+        .home-search>button svg{width:20px;height:20px}
+        .home-section{width:100%}
+        .home-section h2{font-size:15px;font-weight:600;line-height:1.35;letter-spacing:-.01em;margin:0 0 12px}
+        #quick-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%}
+        #quick-links>button{display:flex;align-items:center;justify-content:flex-start;gap:10px;width:100%;min-height:76px;margin:0;padding:14px 12px;border:1px solid var(--border-color);border-radius:19px;background:var(--bg-nav);color:var(--text-main);text-align:left;font-family:inherit;overflow:hidden}
+        .home-site-icon{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:11px;background:var(--hover-bg);background:color-mix(in srgb,var(--accent-color) 10%,transparent);color:var(--accent-color)}
+        .home-site-icon svg{width:19px;height:19px}
+        .home-site-label{display:flex;flex-direction:column;gap:3px;overflow:hidden}
+        .home-site-label strong{font-size:13px;line-height:1.3;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .home-site-label small{font-size:10px;line-height:1.3;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        #home-bookmarks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+        #home-bookmarks>button{min-height:46px;width:100%;max-width:none!important;margin:0;padding:12px;border:1px solid var(--border-color);border-radius:14px;background:var(--bg-nav);color:var(--text-main);font-family:inherit;font-size:13px;line-height:1.4;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        #home-bookmarks>button:last-child{grid-column:1/-1;color:var(--accent-color);text-align:center;background:transparent;border-style:dashed}
+        #home-bookmarks-empty{margin:0;padding:19px 16px;border:1px dashed var(--border-color);border-radius:17px;color:var(--text-muted);font-size:13px;line-height:1.5}
+        #private-note{margin:0;padding:14px 16px;border-radius:15px;background:var(--bg-nav);border:1px solid var(--border-color);font-size:12px;line-height:1.6;color:var(--text-muted)}
+        #view-newtab button:active{opacity:.72}
+        #view-newtab button:focus-visible{outline:2px solid var(--accent-color);outline-offset:3px}
+        @media(min-width:700px){.home-layout{padding:42px 32px 32px;gap:30px}#quick-links{grid-template-columns:repeat(4,minmax(0,1fr))}#quick-links>button{min-height:108px;flex-direction:column;align-items:flex-start;gap:12px;padding:16px}.home-site-label strong{font-size:14px}.home-site-label small{font-size:11px}#home-bookmarks{grid-template-columns:repeat(3,minmax(0,1fr))}}
+        @media(max-width:350px){.home-layout{padding:20px 14px;gap:22px}#quick-links>button{gap:7px;padding:12px 9px}.home-site-icon{width:28px;height:28px}.home-site-label strong{font-size:12px}.home-site-label small{font-size:9px}}
+        @media(max-height:420px){.home-layout{padding-top:14px;gap:18px}.home-intro{gap:4px}#logo-container{margin:0 0 4px!important}#home-title{font-size:22px}.home-subtitle{font-size:12px}.home-search{min-height:54px}#quick-links>button{min-height:66px}}
+        @media(prefers-reduced-motion:reduce){#view-newtab *{transition:none!important;scroll-behavior:auto!important}}
         @media(max-width:600px){
             #tabs-container .tab-element{min-width:108px!important;padding-left:9px;padding-right:7px}
             #tabs-container+div{margin-left:3px}
             #private-badge{font-size:9px;max-width:58px;white-space:normal;line-height:11px}
-            #quick-links{gap:3px}#quick-links>button{width:70px;padding:6px}
-            #view-newtab{overflow-y:auto;justify-content:flex-start;padding-top:max(30px,5vh);padding-bottom:24px}
-            #logo-container{margin-top:auto;margin-bottom:24px}
-            #view-newtab>div:last-child{margin-bottom:auto}
             #internal-content{padding:24px 16px}
             #internal-content>.grid{display:block}
             #internal-content>.grid>div:first-child{margin-bottom:18px}
-            #sport-logo .text-4xl{font-size:24px}#sport-logo .w-12{width:32px;height:32px}
         }
     </style>
 </head>
 <body class="h-full flex flex-col overflow-hidden select-none">
 
     <!-- 1. ВЕРХНЯЯ ПАНЕЛЬ С ВКЛАДКАМИ -->
-    <div class="drag-region flex items-end justify-between pr-2 pt-2" style="background-color: var(--bg-top)">
+    <div id="desktop-tab-strip" class="drag-region flex items-end justify-between pr-2 pt-2" style="background-color: var(--bg-top)">
         <div class="flex items-end pl-2 w-full overflow-x-auto scrollbar-none space-x-1" id="tabs-container">
             <!-- Вкладки генерируются динамически через JavaScript -->
         </div>
@@ -139,7 +176,7 @@
     </div>
 
     <!-- 2. ПАНЕЛЬ НАВИГАЦИИ (АДРЕСНАЯ СТРОКА) -->
-    <div class="flex items-center justify-between px-2 py-1.5 border-b relative z-20 shadow-sm" style="background-color: var(--bg-nav); border-color: var(--border-color)">
+    <div id="desktop-navigation" class="flex items-center justify-between px-2 py-1.5 border-b relative z-20 shadow-sm" style="background-color: var(--bg-nav); border-color: var(--border-color)">
         
         <!-- Кнопки Назад / Вперед / Обновить -->
         <div class="flex items-center space-x-1 mr-2 text-sel-textmuted">
@@ -174,10 +211,10 @@
     <div id="content-area" class="flex-1 relative flex flex-col overflow-hidden" style="background-color: var(--bg-main)">
         
         <!-- СЛОЙ 1: НОВАЯ ВКЛАДКА (NEW TAB) -->
-        <div id="view-newtab" class="absolute inset-0 flex flex-col items-center justify-center z-10 px-4" style="background-image: linear-gradient(to bottom right, var(--ntp-grad-1), var(--ntp-grad-2))">
-            
-            <!-- Стандартное Лого / Логотип WC 2026 -->
-            <div id="logo-container" class="flex items-center space-x-3 mb-8">
+        <div id="view-newtab" class="sel-home absolute inset-0 z-10">
+            <main class="home-layout">
+                <section class="home-intro" aria-labelledby="home-title">
+                    <div id="logo-container" class="flex items-center space-x-3 mb-8">
                 <!-- Обычное лого по умолчанию -->
                 <div id="default-logo" class="flex items-center space-x-3">
                     <svg width="50" height="50" viewBox="0 0 40 40" fill="none">
@@ -197,27 +234,32 @@
                     </span>
                 </div>
             </div>
-
-            <!-- Строка Поиска -->
-            <div class="w-full max-w-[580px] rounded-full shadow-md border flex items-center px-4 py-3 hover:shadow-lg transition-all mb-8" style="background-color: var(--bg-nav); border-color: var(--border-color)">
-                <i data-lucide="search" class="w-5 h-5 text-gray-400 mr-3 shrink-0"></i>
-                <input id="main-search-input" type="search" class="flex-1 bg-transparent border-none focus:outline-none text-[15px] text-sel-text" placeholder="Поиск в Интернете...">
-            </div>
-
-            <div class="w-full max-w-[580px]">
-                <div class="text-[11px] text-sel-textmuted text-center mb-3">Быстрый доступ</div>
-                <div class="flex items-center justify-center gap-3" id="quick-links">
-                    <button data-url="https://www.google.com" class="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-sel-textmuted text-[11px] w-20"><span class="rounded-full p-3 border" style="background-color:var(--bg-nav);border-color:var(--border-color)"><i data-lucide="search" class="w-5 h-5"></i></span>Google</button>
-                    <button data-url="https://ya.ru" class="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-sel-textmuted text-[11px] w-20"><span class="rounded-full p-3 border" style="background-color:var(--bg-nav);border-color:var(--border-color)"><i data-lucide="globe" class="w-5 h-5"></i></span>Яндекс</button>
-                    <button data-url="https://www.youtube.com" class="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-sel-textmuted text-[11px] w-20"><span class="rounded-full p-3 border" style="background-color:var(--bg-nav);border-color:var(--border-color)"><i data-lucide="play" class="w-5 h-5"></i></span>YouTube</button>
-                    <button data-url="https://ru.wikipedia.org" class="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-sel-textmuted text-[11px] w-20"><span class="rounded-full p-3 border" style="background-color:var(--bg-nav);border-color:var(--border-color)"><i data-lucide="book-open" class="w-5 h-5"></i></span>Wikipedia</button>
-                </div>
-                <div id="home-bookmarks" class="hidden flex flex-wrap items-center justify-center gap-2 mt-5"></div>
-                <p id="private-note" class="hidden text-[11px] text-sel-textmuted text-center mt-5 leading-relaxed">История и cookie этого окна не сохраняются после закрытия. Скачанные файлы остаются на диске. Режим не скрывает активность от сайтов и провайдера.</p>
-            </div>
-
+                    <h1 id="home-title">С чего начнём?</h1>
+                    <p class="home-subtitle">Поиск и любимые сайты всегда рядом.</p>
+                </section>
+                <form id="home-search-form" class="home-search" role="search">
+                    <label class="sr-only" for="main-search-input">Поиск или адрес сайта</label>
+                    <i data-lucide="search" aria-hidden="true"></i>
+                    <input id="main-search-input" type="search" placeholder="Поиск или адрес сайта" enterkeyhint="search" autocomplete="off" autocapitalize="none" spellcheck="false">
+                    <button type="submit" aria-label="Начать поиск"><i data-lucide="arrow-right" aria-hidden="true"></i></button>
+                </form>
+                <section class="home-section" aria-labelledby="quick-title">
+                    <h2 id="quick-title">Быстрый доступ</h2>
+                    <div id="quick-links" class="home-quick-grid">
+                        <button data-url="https://www.google.com"><span class="home-site-icon"><i data-lucide="search" aria-hidden="true"></i></span><span class="home-site-label"><strong>Google</strong><small>google.com</small></span></button>
+                        <button data-url="https://ya.ru"><span class="home-site-icon"><i data-lucide="globe" aria-hidden="true"></i></span><span class="home-site-label"><strong>Яндекс</strong><small>ya.ru</small></span></button>
+                        <button data-url="https://www.youtube.com"><span class="home-site-icon"><i data-lucide="play" aria-hidden="true"></i></span><span class="home-site-label"><strong>YouTube</strong><small>youtube.com</small></span></button>
+                        <button data-url="https://ru.wikipedia.org"><span class="home-site-icon"><i data-lucide="book-open" aria-hidden="true"></i></span><span class="home-site-label"><strong>Wikipedia</strong><small>wikipedia.org</small></span></button>
+                    </div>
+                </section>
+                <section class="home-section home-saved" aria-labelledby="saved-title">
+                    <h2 id="saved-title">Ваши закладки</h2>
+                    <div id="home-bookmarks" class="hidden"></div>
+                    <p id="home-bookmarks-empty">Сохранённые страницы появятся здесь.</p>
+                </section>
+                <p id="private-note" class="hidden">История и cookie этого окна не сохраняются после закрытия. Скачанные файлы остаются на диске. Режим не скрывает активность от сайтов и провайдера.</p>
+            </main>
         </div>
-
         <!-- СЛОЙ 2: ВЕБ-ОБЛАСТЬ (CHROMIUM WEBVIEW) -->
         <div id="view" class="absolute inset-0 w-full h-full z-0 bg-white">
             <!-- Webview для сайтов рендерятся тут -->
@@ -399,6 +441,19 @@
         function openGoogleMatch(query) { navigateTo('https://www.google.com/search?q=' + encodeURIComponent(query)); }
         function handleSearch(event) { if (event.key === 'Enter' && event.target.value.trim()) { event.preventDefault(); navigateTo(event.target.value); event.target.blur(); } }
         document.getElementById('main-search-input').addEventListener('keydown', handleSearch);
+        document.getElementById('home-search-form').addEventListener('submit', function (event) {
+            event.preventDefault();
+            const input = document.getElementById('main-search-input');
+            if (input.value.trim()) { navigateTo(input.value); input.blur(); }
+        });
+        function keepMobileSearchVisible() {
+            if (document.activeElement === document.getElementById('main-search-input')) {
+                requestAnimationFrame(function () { document.getElementById('home-search-form').scrollIntoView({block:'nearest',behavior:'auto'}); });
+            }
+        }
+        document.getElementById('main-search-input').addEventListener('focus', keepMobileSearchVisible);
+        window.addEventListener('resize', keepMobileSearchVisible);
+        if (window.visualViewport) window.visualViewport.addEventListener('resize', keepMobileSearchVisible);
         document.getElementById('address-input').addEventListener('keydown', handleSearch);
         function openInternal(page) { navigateTo('sel://' + page); }
         function renderInternalPage(page) {
@@ -500,6 +555,7 @@
                 container.appendChild(all);
             }
             container.classList.toggle('hidden', !container.childElementCount);
+            document.getElementById('home-bookmarks-empty').classList.toggle('hidden', !!container.childElementCount);
         }
         function reportBounds() {
             const rect = document.getElementById('content-area').getBoundingClientRect();
@@ -514,7 +570,7 @@
             const theme = incoming.theme || incoming.Theme || 'light';
             settings = {
                 theme: theme === 'wc2026' ? settings.theme : theme,
-                colorTheme: theme === 'wc2026' ? 'wc2026' : 'default',
+                colorTheme: incoming.colorTheme || (theme === 'wc2026' ? 'wc2026' : 'default'),
                 searchEngine: incoming.searchEngine || incoming.SearchEngine || 'google',
                 RestoreSession: incoming.RestoreSession !== false,
                 CloseTabBehavior: incoming.CloseTabBehavior || 'right',
