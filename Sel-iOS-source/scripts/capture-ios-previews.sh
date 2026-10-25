@@ -52,11 +52,15 @@ print(next((d for d in types if d["name"]==preferred),types[-1])["identifier"])
   xcrun simctl install "$current_device" "$app"
   xcrun simctl launch "$current_device" "$bundle_id" --sel-ui-smoke
   data_container=$(xcrun simctl get_app_container "$current_device" "$bundle_id" data)
-  for attempt in {1..50}; do
+  for attempt in {1..100}; do
     [[ -f "$data_container/tmp/sel-ui-smoke.json" ]] && break
     sleep 0.4
   done
-  if [[ ! -f "$data_container/tmp/sel-ui-smoke.json" ]]; then echo 'The simulator application did not finish its native UI smoke checks.' >&2; exit 1; fi
+  if [[ ! -f "$data_container/tmp/sel-ui-smoke.json" ]]; then
+    xcrun simctl io "$current_device" screenshot "$output/$family-smoke-timeout.png"
+    echo 'The simulator application did not finish its native UI smoke checks.' >&2
+    exit 1
+  fi
   cp "$data_container/tmp/sel-ui-smoke.json" "$output/$family-smoke.json"
   python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(json.dumps(r,ensure_ascii=False,indent=2)); assert r["passed"], "Native iOS UI smoke checks failed"' "$output/$family-smoke.json"
   for screen in home tabs settings search home-dark; do
