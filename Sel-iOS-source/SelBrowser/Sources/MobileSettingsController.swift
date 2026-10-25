@@ -201,7 +201,7 @@ final class MobileSettingsController: UITableViewController, UISearchResultsUpda
         name.textColor = .label
         name.numberOfLines = 0
         let subtitle = UILabel()
-        subtitle.text = isPrivate ? "Настройки приватного просмотра" : "Ваш браузер на iPhone и iPad"
+        subtitle.text = "Общие настройки Sel на iPhone и iPad"
         subtitle.font = .preferredFont(forTextStyle: .subheadline)
         subtitle.adjustsFontForContentSizeCategory = true
         subtitle.textColor = .secondaryLabel

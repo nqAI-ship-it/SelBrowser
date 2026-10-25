@@ -17,6 +17,7 @@ import UIKit
     private var currentURL = "sel://newtab"
     private var currentIsPrivate = false
     private var settingsWidth: NSLayoutConstraint!
+    private var addressHeight: NSLayoutConstraint!
     private var headerRow: UIStackView!
     private weak var edgeScrollView: UIScrollView?
     var onNavigate: ((String) -> Void)?
@@ -27,11 +28,21 @@ import UIKit
     var onTabs: (() -> Void)?
     var onSettings: (() -> Void)?
     var onMenu: (() -> Void)?
+    var onMetricsChange: ((CGFloat) -> Void)?
+    var preferredHeaderHeight: CGFloat { max(52, ceil(UIFont.preferredFont(forTextStyle: .body).lineHeight + 16)) }
 
     override init() {
         super.init()
         configureHeader()
         configureFooter()
+        NotificationCenter.default.addObserver(self, selector: #selector(updateTextMetrics), name: UIContentSizeCategory.didChangeNotification, object: nil)
+    }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
+
+    @objc private func updateTextMetrics() {
+        addressHeight.constant = preferredHeaderHeight
+        onMetricsChange?(preferredHeaderHeight)
     }
 
     private func configureHeader() {
@@ -41,12 +52,13 @@ import UIKit
         headerRow.axis = .horizontal; headerRow.spacing = 10; headerRow.alignment = .center
         headerRow.translatesAutoresizingMaskIntoConstraints = false
         header.contentView.addSubview(headerRow)
+        addressHeight = addressPill.heightAnchor.constraint(equalToConstant: preferredHeaderHeight)
         NSLayoutConstraint.activate([
             headerRow.leadingAnchor.constraint(equalTo: header.contentView.leadingAnchor),
             headerRow.trailingAnchor.constraint(equalTo: header.contentView.trailingAnchor),
             headerRow.topAnchor.constraint(equalTo: header.contentView.topAnchor),
             headerRow.bottomAnchor.constraint(equalTo: header.contentView.bottomAnchor),
-            addressPill.heightAnchor.constraint(equalToConstant: 52)
+            addressHeight
         ])
         securityIcon.contentMode = .scaleAspectFit
         securityIcon.tintColor = .secondaryLabel

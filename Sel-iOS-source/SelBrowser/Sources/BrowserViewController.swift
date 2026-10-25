@@ -27,6 +27,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
     private var retainedDownloads: [ObjectIdentifier: WKDownload] = [:]
     private var storageErrorShown = false
     private let mobileChrome = MobileBrowserChrome()
+    private var headerHeight: NSLayoutConstraint!
     private weak var tabOverview: TabOverviewController?
     private var snapshotsInProgress = Set<String>()
     private var didPreparePreview = false
@@ -85,11 +86,12 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
     private func configureMobileChrome() {
         view.addSubview(mobileChrome.header)
         view.addSubview(mobileChrome.footer)
+        headerHeight = mobileChrome.header.heightAnchor.constraint(equalToConstant: mobileChrome.preferredHeaderHeight)
         NSLayoutConstraint.activate([
             mobileChrome.header.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
             mobileChrome.header.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
             mobileChrome.header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 6),
-            mobileChrome.header.heightAnchor.constraint(equalToConstant: 52),
+            headerHeight,
             mobileChrome.footer.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 14),
             mobileChrome.footer.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -14),
             mobileChrome.footer.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -8),
@@ -103,6 +105,10 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         mobileChrome.onTabs = { [weak self] in self?.showTabOverview() }
         mobileChrome.onSettings = { [weak self] in self?.showSettings() }
         mobileChrome.onMenu = { [weak self] in self?.showMenu() }
+        mobileChrome.onMetricsChange = { [weak self] height in
+            self?.headerHeight.constant = height
+            self?.view.setNeedsLayout()
+        }
     }
 
     private func configureShell() {
@@ -520,11 +526,14 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         #endif
         guard let index = arguments.firstIndex(of: "--sel-ui-preview"), arguments.indices.contains(index + 1) else { return }
         let screen = arguments[index + 1]
-        if screen == "tabs" {
+        if screen == "tabs" || screen == "tabs-search" {
             // Only the simulator smoke launch creates these local metadata cards. No website is loaded.
             let pages = [("https://www.apple.com", "Apple"), ("https://ru.wikipedia.org", "Википедия"), ("https://www.youtube.com", "YouTube")]
             for (url, title) in pages { let tab = BrowserTab(url: url); tab.title = title; normal.tabs.append(tab) }
             showTabOverview()
+            if screen == "tabs-search" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.tabOverview?.focusSearch() }
+            }
         } else if screen == "settings" { showSettings() }
         else if screen == "search" { mobileChrome.focusAddress() }
         else if screen == "home-dark" { var settings = normal.settings; settings.theme = "dark"; applySettings(settings) }

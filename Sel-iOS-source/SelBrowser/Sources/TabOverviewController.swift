@@ -38,6 +38,9 @@ final class TabOverviewController: UIViewController, UISearchBarDelegate, UIColl
     private lazy var collectionView = UICollectionView(frame: .zero, collectionViewLayout: flowLayout)
     private var dataSource: UICollectionViewDiffableDataSource<Int, String>!
     private var lastGridWidth: CGFloat = 0
+    private var headerStack: UIStackView!
+    private var headingRow: UIStackView!
+    private var headerTopConstraint: NSLayoutConstraint!
 
     init(isPrivate: Bool) {
         self.isPrivate = isPrivate
@@ -85,6 +88,11 @@ final class TabOverviewController: UIViewController, UISearchBarDelegate, UIColl
         if isViewLoaded { render() }
     }
 
+    func focusSearch() {
+        loadViewIfNeeded()
+        searchBar.becomeFirstResponder()
+    }
+
     private func configureHeader() {
         titleLabel.text = "Вкладки"
         titleLabel.font = .preferredFont(forTextStyle: .largeTitle).withTraits(.traitBold)
@@ -99,19 +107,19 @@ final class TabOverviewController: UIViewController, UISearchBarDelegate, UIColl
         moreButton.configuration?.cornerStyle = .capsule
 
         let heading = UIStackView(arrangedSubviews: [titleLabel, UIView(), moreButton])
+        headingRow = heading
         heading.alignment = .center
         heading.spacing = 12
-        heading.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(heading)
         moreButton.widthAnchor.constraint(equalToConstant: 44).isActive = true
-        moreButton.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        let moreHeight = moreButton.heightAnchor.constraint(equalToConstant: 44)
+        // A hidden arranged row must be allowed to collapse to zero height.
+        moreHeight.priority = .init(999)
+        moreHeight.isActive = true
 
         modeControl.selectedSegmentIndex = isPrivate ? 1 : 0
         modeControl.accessibilityLabel = "Режим вкладок"
         modeControl.accessibilityIdentifier = "mobileTabMode"
         modeControl.addTarget(self, action: #selector(changeMode), for: .valueChanged)
-        modeControl.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(modeControl)
 
         searchBar.delegate = self
         searchBar.placeholder = "Поиск по вкладкам"
@@ -121,31 +129,29 @@ final class TabOverviewController: UIViewController, UISearchBarDelegate, UIColl
         searchBar.searchTextField.autocorrectionType = .no
         searchBar.searchTextField.returnKeyType = .done
         searchBar.accessibilityLabel = "Поиск по открытым вкладкам"
-        searchBar.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(searchBar)
 
         countLabel.font = .preferredFont(forTextStyle: .footnote)
         countLabel.adjustsFontForContentSizeCategory = true
         countLabel.textColor = .secondaryLabel
-        countLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(countLabel)
+        headerStack = UIStackView(arrangedSubviews: [heading, modeControl, searchBar, countLabel])
+        headerStack.axis = .vertical
+        headerStack.spacing = 8
+        headerStack.setCustomSpacing(18, after: heading)
+        headerStack.setCustomSpacing(2, after: searchBar)
+        headerStack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(headerStack)
+
+        headerTopConstraint = headerStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12)
+        let headingHeight = heading.heightAnchor.constraint(greaterThanOrEqualToConstant: 46)
+        headingHeight.priority = .init(999)
+        let modeHeight = modeControl.heightAnchor.constraint(greaterThanOrEqualToConstant: 40)
+        modeHeight.priority = .init(999)
 
         NSLayoutConstraint.activate([
-            heading.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 20),
-            heading.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
-            heading.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
-            heading.heightAnchor.constraint(greaterThanOrEqualToConstant: 46),
-            modeControl.leadingAnchor.constraint(equalTo: heading.leadingAnchor),
-            modeControl.trailingAnchor.constraint(equalTo: heading.trailingAnchor),
-            modeControl.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 18),
-            modeControl.heightAnchor.constraint(greaterThanOrEqualToConstant: 40),
-            searchBar.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 10),
-            searchBar.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -10),
-            searchBar.topAnchor.constraint(equalTo: modeControl.bottomAnchor, constant: 8),
-            searchBar.heightAnchor.constraint(greaterThanOrEqualToConstant: 52),
-            countLabel.leadingAnchor.constraint(equalTo: heading.leadingAnchor),
-            countLabel.trailingAnchor.constraint(equalTo: heading.trailingAnchor),
-            countLabel.topAnchor.constraint(equalTo: searchBar.bottomAnchor, constant: 2)
+            headerStack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),
+            headerStack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
+            headerTopConstraint, headingHeight, modeHeight,
+            searchBar.heightAnchor.constraint(greaterThanOrEqualToConstant: 52)
         ])
     }
 
@@ -164,7 +170,7 @@ final class TabOverviewController: UIViewController, UISearchBarDelegate, UIColl
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(collectionView)
         NSLayoutConstraint.activate([
-            collectionView.topAnchor.constraint(equalTo: countLabel.bottomAnchor, constant: 2),
+            collectionView.topAnchor.constraint(equalTo: headerStack.bottomAnchor, constant: 2),
             collectionView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor)
         ])
@@ -250,8 +256,8 @@ final class TabOverviewController: UIViewController, UISearchBarDelegate, UIColl
         NSLayoutConstraint.activate([
             bar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             bar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            bar.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            bar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -72),
+            bar.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor),
+            bar.heightAnchor.constraint(equalToConstant: 72),
             buttons.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),
             buttons.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
             buttons.topAnchor.constraint(equalTo: bar.topAnchor, constant: 12),
@@ -319,7 +325,18 @@ final class TabOverviewController: UIViewController, UISearchBarDelegate, UIColl
     }
 
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) { render() }
+    func searchBarTextDidBeginEditing(_ searchBar: UISearchBar) { setSearchEditing(true) }
+    func searchBarTextDidEndEditing(_ searchBar: UISearchBar) { setSearchEditing(false) }
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) { searchBar.resignFirstResponder() }
+
+    private func setSearchEditing(_ editing: Bool) {
+        // Keep the result grid usable above the keyboard, including short landscape windows.
+        headingRow.isHidden = editing
+        modeControl.isHidden = editing
+        countLabel.isHidden = editing
+        headerTopConstraint.constant = editing ? 4 : 12
+        view.setNeedsLayout()
+    }
 
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let width = collectionView.bounds.width
