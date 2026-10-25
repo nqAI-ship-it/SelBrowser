@@ -63,7 +63,7 @@ print(next((d for d in types if d["name"]==preferred),types[-1])["identifier"])
   fi
   cp "$data_container/tmp/sel-ui-smoke.json" "$output/$family-smoke.json"
   python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(json.dumps(r,ensure_ascii=False,indent=2)); assert r["passed"], "Native iOS UI smoke checks failed"' "$output/$family-smoke.json"
-  for screen in home tabs settings search home-dark; do
+  for screen in home tabs tabs-search settings search home-dark; do
     xcrun simctl terminate "$current_device" "$bundle_id" >/dev/null 2>&1 || true
     xcrun simctl launch "$current_device" "$bundle_id" --sel-ui-preview "$screen" | tee "$output/$family-$screen-launch.txt"
     # The local shell and the native presentation need to complete their first layout.
