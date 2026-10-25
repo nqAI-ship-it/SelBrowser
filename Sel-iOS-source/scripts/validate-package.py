@@ -18,12 +18,15 @@ required = [
     "SelBrowser/Sources/BrowserViewController.swift",
     "SelBrowser/Sources/BoundedIconRequest.swift",
     "SelBrowser/Sources/BrowserGlass.swift",
+    "SelBrowser/Sources/BrowserWebView.swift",
     "SelBrowser/Sources/MobileBrowserChrome.swift",
     "SelBrowser/Sources/TabOverviewController.swift",
     "SelBrowser/Sources/MobileSettingsController.swift",
     "SelBrowser/Resources/Shell.html",
     "SelBrowser/Resources/tailwind.js",
     "SelBrowser/Resources/lucide.js",
+    "SelBrowserUITests/BrowserKeyboardTests.swift",
+    "scripts/run-ios-keyboard-tests.sh",
     ".github/workflows/ios-build.yml",
 ]
 for name in required:
@@ -47,8 +50,8 @@ assert references.issubset(definitions), f"Undefined Xcode objects: {references 
 assert "fileSystemSynchronizedGroups" in project
 assert "IPHONEOS_DEPLOYMENT_TARGET = 16.0" in project
 assert project.count("PRODUCT_BUNDLE_IDENTIFIER = com.selbrowser.ios;") == 2, "Keep the installed app's identity across updates"
-assert project.count("MARKETING_VERSION = 1.1.0;") == 2
-assert project.count("CURRENT_PROJECT_VERSION = 2;") == 2
+assert project.count("MARKETING_VERSION = 1.1.1;") == 2
+assert project.count("CURRENT_PROJECT_VERSION = 3;") == 2
 scheme = ET.parse(root / "SelBrowser.xcodeproj/xcshareddata/xcschemes/SelBrowser.xcscheme")
 for buildable in scheme.findall(".//BuildableReference"):
     assert buildable.attrib["BlueprintIdentifier"] in definitions

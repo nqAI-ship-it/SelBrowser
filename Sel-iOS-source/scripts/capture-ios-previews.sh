@@ -45,6 +45,7 @@ if not types: raise SystemExit("No compatible device type for "+family)
 print(next((d for d in types if d["name"]==preferred),types[-1])["identifier"])
 ' "${family%%-*}")
   current_device=$(xcrun simctl create "Sel preview $family" "$device_type" "$selected_runtime")
+  echo "Preview family=$family runtime=$selected_runtime type=$device_type"
   xcrun simctl boot "$current_device"
   xcrun simctl bootstatus "$current_device" -b
   xcrun simctl status_bar "$current_device" override --time '9:41' --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
@@ -63,7 +64,10 @@ print(next((d for d in types if d["name"]==preferred),types[-1])["identifier"])
   fi
   cp "$data_container/tmp/sel-ui-smoke.json" "$output/$family-smoke.json"
   python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(json.dumps(r,ensure_ascii=False,indent=2)); assert r["passed"], "Native iOS UI smoke checks failed"' "$output/$family-smoke.json"
-  for screen in home tabs tabs-search settings search home-dark; do
+  if [[ "$family" == 'iPhone' ]]; then
+    bash scripts/run-ios-keyboard-tests.sh "$current_device" "$family"
+  fi
+  for screen in home tabs tabs-search settings search home-dark page-dark form address-long; do
     xcrun simctl terminate "$current_device" "$bundle_id" >/dev/null 2>&1 || true
     xcrun simctl launch "$current_device" "$bundle_id" --sel-ui-preview "$screen" | tee "$output/$family-$screen-launch.txt"
     # The local shell and the native presentation need to complete their first layout.

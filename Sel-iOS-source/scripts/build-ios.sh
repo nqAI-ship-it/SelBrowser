@@ -9,7 +9,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
-for file in SelBrowser/Info.plist SelBrowser/Sources/AppDelegate.swift SelBrowser/Sources/SceneDelegate.swift SelBrowser/Sources/BrowserModels.swift SelBrowser/Sources/BrowserViewController.swift SelBrowser/Sources/BoundedIconRequest.swift SelBrowser/Sources/BrowserGlass.swift SelBrowser/Sources/MobileBrowserChrome.swift SelBrowser/Sources/TabOverviewController.swift SelBrowser/Sources/MobileSettingsController.swift SelBrowser/Resources/Shell.html SelBrowser/Resources/tailwind.js SelBrowser/Resources/lucide.js; do
+for file in SelBrowser/Info.plist SelBrowser/Sources/AppDelegate.swift SelBrowser/Sources/SceneDelegate.swift SelBrowser/Sources/BrowserModels.swift SelBrowser/Sources/BrowserViewController.swift SelBrowser/Sources/BoundedIconRequest.swift SelBrowser/Sources/BrowserGlass.swift SelBrowser/Sources/BrowserWebView.swift SelBrowser/Sources/MobileBrowserChrome.swift SelBrowser/Sources/TabOverviewController.swift SelBrowser/Sources/MobileSettingsController.swift SelBrowser/Resources/Shell.html SelBrowser/Resources/tailwind.js SelBrowser/Resources/lucide.js; do
   if [[ ! -f "$file" ]]; then echo "Required source/resource is missing: $file" >&2; exit 1; fi
 done
 
