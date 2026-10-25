@@ -1,0 +1,82 @@
+name: Build iOS
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'SelBrowser/**'
+      - 'SelBrowser.xcodeproj/**'
+      - 'scripts/**'
+      - '.github/workflows/ios-build.yml'
+      - 'ios/**'
+      - 'Sel-iOS-source/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Do not consume paid/private-repository macOS minutes by accident.
+    if: ${{ github.event.repository.private == false }}
+    name: Compile and package unsigned iPhone app
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Download this repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Detect package directory
+        shell: bash
+        run: |
+          if [[ -f SelBrowser.xcodeproj/project.pbxproj ]]; then
+            echo 'IOS_ROOT=.' >> "$GITHUB_ENV"
+          elif [[ -f ios/SelBrowser.xcodeproj/project.pbxproj ]]; then
+            echo 'IOS_ROOT=ios' >> "$GITHUB_ENV"
+          elif [[ -f Sel-iOS-source/SelBrowser.xcodeproj/project.pbxproj ]]; then
+            echo 'IOS_ROOT=Sel-iOS-source' >> "$GITHUB_ENV"
+          else
+            echo 'SelBrowser.xcodeproj is missing. Upload the complete contents of the ios package.' >&2
+            exit 1
+          fi
+
+      - name: Compile for iOS Simulator without signing
+        working-directory: ${{ env.IOS_ROOT }}
+        run: |
+          # GitHub's web upload can omit the nested hidden .github folder.
+          # The checked-out root workflow is the package workflow in that layout.
+          if [[ ! -f .github/workflows/ios-build.yml ]]; then
+            mkdir -p .github/workflows
+            cp "$GITHUB_WORKSPACE/.github/workflows/ios-build.yml" .github/workflows/ios-build.yml
+          fi
+          python3 scripts/validate-package.py
+          node scripts/validate-shell.mjs
+          bash scripts/build-ios.sh --simulator-only
+
+      - name: Compile and package for iPhone without signing
+        working-directory: ${{ env.IOS_ROOT }}
+        run: bash scripts/build-ios.sh
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: SelBrowser-unsigned-IPA
+          path: |
+            ${{ env.IOS_ROOT }}/dist/SelBrowser-unsigned.ipa
+            ${{ env.IOS_ROOT }}/dist/SelBrowser-unsigned.ipa.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: SelBrowser-build-logs
+          path: ${{ env.IOS_ROOT }}/build-logs/
+          if-no-files-found: warn
+          retention-days: 7
