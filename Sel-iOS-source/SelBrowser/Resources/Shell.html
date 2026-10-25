@@ -518,7 +518,7 @@
             const theme = incoming.theme || incoming.Theme || 'light';
             settings = {
                 theme: theme === 'wc2026' ? settings.theme : theme,
-                colorTheme: theme === 'wc2026' ? 'wc2026' : 'default',
+                colorTheme: incoming.colorTheme || (theme === 'wc2026' ? 'wc2026' : 'default'),
                 searchEngine: incoming.searchEngine || incoming.SearchEngine || 'google',
                 RestoreSession: incoming.RestoreSession !== false,
                 CloseTabBehavior: incoming.CloseTabBehavior || 'right',
