@@ -200,7 +200,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
             let webView = makeWebsiteView(for: tab, in: context)
             webView.isHidden = false; container.bringSubviewToFront(webView)
             if !tab.hasLoaded, let url = URL(string: tab.url) {
-                tab.hasLoaded = true; webView.load(URLRequest(url: url))
+                tab.hasLoaded = true
+                if webView.url != nil { webView.reload() } else { webView.load(URLRequest(url: url)) }
             }
         }
         pushState(); if !context.isPrivate { scheduleSave() }
@@ -451,6 +452,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
         snapshotsInProgress.insert(tab.id)
         let configuration = WKSnapshotConfiguration()
         configuration.rect = webView.bounds
+        configuration.afterScreenUpdates = false
         configuration.snapshotWidth = NSNumber(value: 220)
         webView.takeSnapshot(with: configuration) { [weak self, weak tab, weak owner] image, _ in
             guard let self = self else { return }
@@ -638,6 +640,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         if webView === shell { shellReady = false; lastShellJSON = ""; shell.reload() }
         else if context.active?.webView === webView { webView.reload() }
+        else { tab(for: webView)?.hasLoaded = false }
     }
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
@@ -825,8 +828,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
     }
     private func share(_ url: URL) {
         let controller = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-        controller.popoverPresentationController?.sourceView = shell
-        controller.popoverPresentationController?.sourceRect = CGRect(x: shell.bounds.midX, y: 75, width: 1, height: 1)
+        controller.popoverPresentationController?.sourceView = mobileChrome.footer
+        controller.popoverPresentationController?.sourceRect = CGRect(x: mobileChrome.footer.bounds.midX, y: 0, width: 1, height: 1)
         present(controller, animated: true)
     }
     private func showList(_ title: String, rows: [BrowserRow], selected: @escaping (BrowserRow) -> Void, deleted: ((BrowserRow) -> Void)? = nil) {
