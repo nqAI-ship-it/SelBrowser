@@ -384,7 +384,7 @@ private final class TabOverviewCell: UICollectionViewCell {
         faviconView.tintColor = .secondaryLabel
         faviconView.layer.cornerRadius = 4
         faviconView.clipsToBounds = true
-        titleLabel.font = .preferredFont(forTextStyle: .subheadline).withTraits(.traitSemibold)
+        titleLabel.font = UIFont.preferredFont(forTextStyle: .subheadline).withTraits(.traitBold)
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 1
         domainLabel.font = .preferredFont(forTextStyle: .caption2)
